@@ -1,4 +1,4 @@
-name: OpenJDK Horizon Research v0.7
+name: OpenJDK Horizon Research v0.8
 
 on:
   workflow_dispatch:
@@ -19,40 +19,38 @@ jobs:
 
       # ============================================================
       # Minecraft-NX
-      # OpenJDK / Horizon Research v0.7
+      # OpenJDK Horizon Research v0.8
       # Created by Farbert_Took
       #
-      # Confirmado ate v0.6:
+      # NOVA ESTRATEGIA:
       #
-      #   Horizon recognition             OK
-      #   horizon-aarch64                 OK
-      #   Boot JDK 20                     OK
-      #   devkitA64 GCC/G++               OK
-      #   Cross compilation               OK
-      #   Target 64-bit                   OK
-      #   libjpeg                         bundled
-      #   giflib                          bundled
-      #   libpng                          bundled
-      #   zlib                            bundled
-      #   CUPS                            bypass Horizon
-      #
-      # v0.7:
-      #
-      #   Fontconfig                      bypass Horizon
+      #   Horizon/AArch64
+      #        +
+      #   Headless
+      #        +
+      #   HotSpot minimal
       #
       # Objetivo:
-      # continuar o configure ate encontrar a proxima barreira.
       #
-      # Os bypasses sao apenas de pesquisa.
-      # Eles NAO significam que java.desktop funciona no Horizon.
+      # Descobrir ate onde o OpenJDK 21 consegue configurar uma
+      # JVM minima para Horizon antes de realmente precisarmos criar:
+      #
+      #   src/hotspot/os/horizon
+      #   src/hotspot/os_cpu/horizon_aarch64
+      #
+      # IMPORTANTE:
+      #
+      # Nao estamos tentando fazer java.desktop funcionar.
+      # Nao estamos linkando bibliotecas Linux no Switch.
+      # Nao esperamos gerar um NRO nesta versao.
       # ============================================================
 
 
       # ============================================================
-      # 1. Ferramentas
+      # 1. Dependencias do BUILD HOST
       # ============================================================
 
-      - name: Install research tools
+      - name: Install build host tools
         shell: bash
         run: |
           set -e
@@ -82,13 +80,13 @@ jobs:
           echo ""
           echo "========================================"
           echo " Minecraft-NX"
-          echo " OpenJDK Horizon Research v0.7"
+          echo " OpenJDK Horizon Research v0.8"
           echo " Created by Farbert_Took"
           echo "========================================"
 
 
       # ============================================================
-      # 2. devkitA64 PATH
+      # 2. PATH devkitA64
       # ============================================================
 
       - name: Configure devkitA64 PATH
@@ -98,9 +96,6 @@ jobs:
 
           echo "/opt/devkitpro/devkitA64/bin" >> "$GITHUB_PATH"
           echo "/opt/devkitpro/tools/bin" >> "$GITHUB_PATH"
-
-          echo ""
-          echo "devkitA64 PATH configurado."
 
 
       # ============================================================
@@ -118,16 +113,12 @@ jobs:
           test -x "$GCC"
           test -x "$GXX"
 
-          echo ""
           echo "===== GCC ====="
           "$GCC" --version
 
           echo ""
           echo "===== G++ ====="
           "$GXX" --version
-
-          echo ""
-          echo "devkitA64 OK"
 
 
       # ============================================================
@@ -144,13 +135,19 @@ jobs:
 
           {
             echo "Minecraft-NX"
-            echo "OpenJDK Horizon Research v0.7"
+            echo "OpenJDK Horizon Research v0.8"
             echo "Created by Farbert_Took"
+            echo ""
+            echo "Target:"
+            echo "Horizon OS / Nintendo Switch / AArch64"
+            echo ""
+            echo "Research configuration:"
+            echo "Headless + HotSpot minimal"
           } > horizon-research/info.txt
 
 
       # ============================================================
-      # 5. Teste Horizon/libnx
+      # 5. Confirma compilacao Horizon/libnx
       # ============================================================
 
       - name: Verify Horizon compilation
@@ -163,8 +160,8 @@ jobs:
 
           int minecraft_nx_horizon_test(void)
           {
-              u64 value = 21;
-              return (int)value;
+              u64 java_version = 21;
+              return (int)java_version;
           }
           EOF
 
@@ -176,17 +173,12 @@ jobs:
             horizon-research/horizon_test.c \
             -o horizon-research/horizon_test.o
 
-          echo ""
-          echo "===== HORIZON OBJECT ====="
-
-          file horizon-research/horizon_test.o
-
-          echo ""
-          echo "AArch64 + libnx OK"
+          file horizon-research/horizon_test.o \
+            | tee horizon-research/horizon-object.txt
 
 
       # ============================================================
-      # 6. Boot JDK 20
+      # 6. Boot JDK
       # ============================================================
 
       - name: Download Boot JDK 20
@@ -197,9 +189,6 @@ jobs:
           rm -rf "$BOOT_JDK"
           mkdir -p "$BOOT_JDK"
 
-          echo ""
-          echo "Baixando Eclipse Temurin JDK 20 x64..."
-
           curl \
             -L \
             --fail \
@@ -207,48 +196,18 @@ jobs:
             -o /tmp/bootjdk.tar.gz \
             "https://api.adoptium.net/v3/binary/latest/20/ga/linux/x64/jdk/hotspot/normal/eclipse"
 
-          echo ""
-          echo "Extraindo Boot JDK..."
-
           tar \
             -xzf /tmp/bootjdk.tar.gz \
             -C "$BOOT_JDK" \
             --strip-components=1
 
-          echo ""
-          echo "===== BOOT JDK ====="
-
-          "$BOOT_JDK/bin/java" -version
-          "$BOOT_JDK/bin/javac" -version
-
-
-      # ============================================================
-      # 7. Valida Boot JDK
-      # ============================================================
-
-      - name: Verify Boot JDK
-        shell: bash
-        run: |
-          set -e
-
-          test -x "$BOOT_JDK/bin/java"
-          test -x "$BOOT_JDK/bin/javac"
-          test -x "$BOOT_JDK/bin/jar"
-
           "$BOOT_JDK/bin/java" -version \
             2>&1 \
             | tee horizon-research/boot-jdk-version.txt
 
-          "$BOOT_JDK/bin/javac" -version \
-            2>&1 \
-            | tee -a horizon-research/boot-jdk-version.txt
-
-          echo ""
-          echo "Boot JDK OK"
-
 
       # ============================================================
-      # 8. OpenJDK 21
+      # 7. OpenJDK 21
       # ============================================================
 
       - name: Clone OpenJDK 21
@@ -263,19 +222,92 @@ jobs:
             https://github.com/openjdk/jdk21u.git \
             openjdk21
 
-          echo ""
-          echo "===== OPENJDK COMMIT ====="
-
           git -C openjdk21 rev-parse HEAD \
             | tee horizon-research/openjdk-commit.txt
 
 
       # ============================================================
-      # 9. Horizon OS mapping
+      # 8. Salva configure --help
       #
-      # aarch64-none-elf
-      #       ↓
-      # horizon-aarch64
+      # Assim nao dependemos de suposicoes sobre as opcoes existentes
+      # nessa revisao exata do jdk21u.
+      # ============================================================
+
+      - name: Inspect configure options
+        shell: bash
+        run: |
+          set -e
+
+          cd openjdk21
+
+          bash configure --help \
+            > ../horizon-research/configure-help.txt \
+            2>&1 \
+            || true
+
+          bash configure --help=short \
+            > ../horizon-research/configure-help-short.txt \
+            2>&1 \
+            || true
+
+          echo "===== HEADLESS ====="
+
+          grep -i -C 3 \
+            'headless' \
+            ../horizon-research/configure-help.txt \
+            || true
+
+          echo ""
+          echo "===== JVM VARIANTS ====="
+
+          grep -i -C 5 \
+            'jvm-variants' \
+            ../horizon-research/configure-help.txt \
+            || true
+
+
+      # ============================================================
+      # 9. Verifica se as opcoes existem
+      # ============================================================
+
+      - name: Verify minimal and headless options
+        shell: bash
+        run: |
+          set -e
+
+          if grep -q -- '--enable-headless-only' \
+            horizon-research/configure-help.txt
+          then
+            echo "HEADLESS_OPTION=yes" \
+              >> "$GITHUB_ENV"
+
+            echo "OpenJDK possui --enable-headless-only"
+          else
+            echo "HEADLESS_OPTION=no" \
+              >> "$GITHUB_ENV"
+
+            echo "ATENCAO:"
+            echo "--enable-headless-only nao apareceu no help."
+          fi
+
+          if grep -q -- '--with-jvm-variants' \
+            horizon-research/configure-help.txt
+          then
+            echo "JVM_VARIANT_OPTION=yes" \
+              >> "$GITHUB_ENV"
+
+            echo "OpenJDK possui --with-jvm-variants"
+          else
+            echo "JVM_VARIANT_OPTION=no" \
+              >> "$GITHUB_ENV"
+
+            echo "ATENCAO:"
+            echo "--with-jvm-variants nao apareceu no help."
+          fi
+
+
+      # ============================================================
+      # 10. Horizon OS mapping
       # ============================================================
 
       - name: Add Horizon OS mapping
@@ -310,17 +342,19 @@ jobs:
                 ;;'''
 
           if fallback in s:
-
               s = s.replace(
                   fallback,
                   insertion + fallback,
                   1
               )
-
           else:
-
               pos = s.find(needle)
-              case_start = s.rfind("*)", 0, pos)
+
+              case_start = s.rfind(
+                  "*)",
+                  0,
+                  pos
+              )
 
               if case_start < 0:
                   raise SystemExit(
@@ -335,56 +369,26 @@ jobs:
 
           p.write_text(s)
 
-          print("Horizon OS mapping inserido.")
+          print(
+              "Target elf sera identificado como Horizon."
+          )
           PY
-
-          echo ""
-          echo "===== HORIZON MAPPING ====="
 
           grep \
             -n \
-            -C 20 \
+            -C 15 \
             'VAR_OS=horizon' \
-            openjdk21/make/autoconf/platform.m4
+            openjdk21/make/autoconf/platform.m4 \
+            | tee horizon-research/horizon-platform-patch.txt
 
 
       # ============================================================
-      # 10. Localiza CUPS e Fontconfig
-      # ============================================================
-
-      - name: Inspect desktop library checks
-        shell: bash
-        run: |
-          set -e
-
-          echo ""
-          echo "===== CUPS ====="
-
-          grep -R -n -E \
-            'Could not find cups|cups/cups.h|cups/ppd.h' \
-            openjdk21/make/autoconf \
-            2>/dev/null \
-            | tee horizon-research/cups-search.txt \
-            || true
-
-          echo ""
-          echo "===== FONTCONFIG ====="
-
-          grep -R -n -E \
-            'Could not find fontconfig|fontconfig/fontconfig.h|FONTCONFIG' \
-            openjdk21/make/autoconf \
-            2>/dev/null \
-            | tee horizon-research/fontconfig-search.txt \
-            || true
-
-
-      # ============================================================
-      # 11. Bypass CUPS para Horizon
+      # 11. CUPS bypass
       #
-      # NAO usa headers/bibliotecas CUPS do Linux.
+      # Mantemos o bypass comprovado no v0.6/v0.7.
       # ============================================================
 
-      - name: Disable CUPS requirement for Horizon
+      - name: Apply Horizon CUPS research bypass
         shell: bash
         run: |
           set -e
@@ -393,11 +397,9 @@ jobs:
           from pathlib import Path
 
           root = Path("openjdk21/make/autoconf")
-
           target = None
 
           for p in root.rglob("*.m4"):
-
               text = p.read_text(errors="ignore")
 
               if "Could not find cups" in text:
@@ -411,23 +413,31 @@ jobs:
 
           text = target.read_text()
 
-          pos = text.find("Could not find cups")
+          pos = text.find(
+              "Could not find cups"
+          )
 
-          if pos < 0:
-              raise SystemExit(
-                  "Mensagem CUPS nao encontrada"
-              )
+          line_start = text.rfind(
+              "\n",
+              0,
+              pos
+          ) + 1
 
-          line_start = text.rfind("\n", 0, pos) + 1
-          line_end = text.find("\n", pos)
+          line_end = text.find(
+              "\n",
+              pos
+          )
 
           if line_end < 0:
               line_end = len(text)
 
-          original_line = text[line_start:line_end]
+          original = text[
+              line_start:line_end
+          ]
 
-          indent = original_line[
-              :len(original_line) - len(original_line.lstrip())
+          indent = original[
+              :len(original)
+              - len(original.lstrip())
           ]
 
           replacement = (
@@ -441,7 +451,7 @@ jobs:
               + '  CUPS_LIBS=""\n'
               + indent
               + 'else\n'
-              + original_line
+              + original
               + '\n'
               + indent
               + 'fi'
@@ -455,39 +465,20 @@ jobs:
 
           target.write_text(text)
 
-          Path(
-              "horizon-research/cups-patched-file.txt"
-          ).write_text(str(target) + "\n")
-
-          print("CUPS Horizon bypass aplicado:", target)
+          print(
+              "CUPS research bypass:",
+              target
+          )
           PY
 
-          CUPS_FILE=$(cat horizon-research/cups-patched-file.txt)
-
-          echo ""
-          echo "===== CUPS PATCH ====="
-
-          grep \
-            -n \
-            -C 15 \
-            'CUPS disabled for experimental Horizon target' \
-            "$CUPS_FILE" \
-            | tee horizon-research/cups-patch-context.txt
-
 
       # ============================================================
-      # 12. Bypass Fontconfig para Horizon
+      # 12. Fontconfig bypass
       #
-      # Mesma regra:
-      #
-      # - nao usa /usr/include/fontconfig
-      # - nao usa libfontconfig Linux
-      # - nao afirma que Fontconfig existe no Horizon
-      #
-      # Apenas permite que o configure de pesquisa continue.
+      # Mantemos o bypass comprovado no v0.7.
       # ============================================================
 
-      - name: Disable Fontconfig requirement for Horizon
+      - name: Apply Horizon Fontconfig research bypass
         shell: bash
         run: |
           set -e
@@ -496,11 +487,9 @@ jobs:
           from pathlib import Path
 
           root = Path("openjdk21/make/autoconf")
-
           target = None
 
           for p in root.rglob("*.m4"):
-
               text = p.read_text(errors="ignore")
 
               if "Could not find fontconfig" in text:
@@ -514,23 +503,31 @@ jobs:
 
           text = target.read_text()
 
-          pos = text.find("Could not find fontconfig")
+          pos = text.find(
+              "Could not find fontconfig"
+          )
 
-          if pos < 0:
-              raise SystemExit(
-                  "Mensagem Fontconfig nao encontrada"
-              )
+          line_start = text.rfind(
+              "\n",
+              0,
+              pos
+          ) + 1
 
-          line_start = text.rfind("\n", 0, pos) + 1
-          line_end = text.find("\n", pos)
+          line_end = text.find(
+              "\n",
+              pos
+          )
 
           if line_end < 0:
               line_end = len(text)
 
-          original_line = text[line_start:line_end]
+          original = text[
+              line_start:line_end
+          ]
 
-          indent = original_line[
-              :len(original_line) - len(original_line.lstrip())
+          indent = original[
+              :len(original)
+              - len(original.lstrip())
           ]
 
           replacement = (
@@ -544,7 +541,7 @@ jobs:
               + '  FONTCONFIG_LIBS=""\n'
               + indent
               + 'else\n'
-              + original_line
+              + original
               + '\n'
               + indent
               + 'fi'
@@ -558,80 +555,157 @@ jobs:
 
           target.write_text(text)
 
-          Path(
-              "horizon-research/fontconfig-patched-file.txt"
-          ).write_text(str(target) + "\n")
-
           print(
-              "Fontconfig Horizon bypass aplicado:",
+              "Fontconfig research bypass:",
               target
           )
           PY
 
-          FONTCONFIG_FILE=$(
-            cat horizon-research/fontconfig-patched-file.txt
-          )
 
-          echo ""
-          echo "===== FONTCONFIG PATCH ====="
+      # ============================================================
+      # 13. NAO fazemos bypass do FreeType
+      #
+      # Queremos descobrir se headless/minimal muda a necessidade.
+      # ============================================================
 
-          grep \
-            -n \
-            -C 15 \
-            'Fontconfig disabled for experimental Horizon target' \
-            "$FONTCONFIG_FILE" \
-            | tee horizon-research/fontconfig-patch-context.txt
+      - name: Record FreeType configuration
+        shell: bash
+        run: |
+          set -e
+
+          grep -R -n -E \
+            'Could not find freetype|FREETYPE|freetype2|freetype/' \
+            openjdk21/make/autoconf \
+            2>/dev/null \
+            | head -n 1000 \
+            > horizon-research/freetype-configure.txt \
+            || true
+
+          echo "FreeType NAO foi bypassado no v0.8."
 
 
       # ============================================================
-      # 13. Salva diff completo
+      # 14. Registra HotSpot OS existentes
       # ============================================================
 
-      - name: Save OpenJDK Horizon v0.7 patch
+      - name: Inspect existing HotSpot OS ports
+        shell: bash
+        run: |
+          set -e
+
+          {
+            echo "Minecraft-NX"
+            echo "HotSpot OS port inventory"
+            echo ""
+
+            echo "===== src/hotspot/os ====="
+
+            find \
+              openjdk21/src/hotspot/os \
+              -mindepth 1 \
+              -maxdepth 1 \
+              -type d \
+              -printf '%f\n' \
+              | sort
+
+            echo ""
+            echo "===== src/hotspot/os_cpu ====="
+
+            find \
+              openjdk21/src/hotspot/os_cpu \
+              -mindepth 1 \
+              -maxdepth 1 \
+              -type d \
+              -printf '%f\n' \
+              | sort
+
+          } | tee horizon-research/hotspot-os-inventory.txt
+
+
+      # ============================================================
+      # 15. Procura referencias de OPENJDK_TARGET_OS
+      #
+      # Isso vai nos mostrar quantos lugares do build system
+      # precisarao aprender sobre "horizon".
+      # ============================================================
+
+      - name: Inspect target OS decisions
+        shell: bash
+        run: |
+          set +e
+
+          grep -R -n \
+            'OPENJDK_TARGET_OS' \
+            openjdk21/make \
+            | head -n 4000 \
+            > horizon-research/target-os-decisions.txt
+
+          exit 0
+
+
+      # ============================================================
+      # 16. Salva nosso patch antes do configure
+      # ============================================================
+
+      - name: Save v0.8 source patch
         shell: bash
         run: |
           set -e
 
           git -C openjdk21 diff \
-            > horizon-research/openjdk-horizon-v0.7.patch
+            > horizon-research/openjdk-horizon-v0.8.patch
 
-          echo ""
-          echo "========================================"
-          echo " PATCH v0.7"
-          echo "========================================"
+          echo "===== PATCH v0.8 ====="
 
-          cat horizon-research/openjdk-horizon-v0.7.patch
+          cat horizon-research/openjdk-horizon-v0.8.patch
 
 
       # ============================================================
-      # 14. Configure
+      # 17. CONFIGURE HEADLESS + MINIMAL
       #
-      # Esperado:
+      # Nao iniciamos make ainda.
       #
-      # CUPS disabled...
-      # Fontconfig disabled...
-      #
-      # Depois queremos descobrir a proxima barreira.
+      # Primeiro precisamos obter uma configuracao coerente.
       # ============================================================
 
-      - name: Probe OpenJDK after Fontconfig patch
+      - name: Configure minimal headless Horizon JVM
         shell: bash
         run: |
           set +e
 
           cd openjdk21
 
+          EXTRA_OPTIONS=""
+
+          if [ "$HEADLESS_OPTION" = "yes" ]; then
+            EXTRA_OPTIONS="$EXTRA_OPTIONS --enable-headless-only=yes"
+          fi
+
+          if [ "$JVM_VARIANT_OPTION" = "yes" ]; then
+            EXTRA_OPTIONS="$EXTRA_OPTIONS --with-jvm-variants=minimal"
+          fi
+
+          echo "===== CONFIGURE OPTIONS ====="
+
+          echo "$EXTRA_OPTIONS" \
+            | tee ../horizon-research/v0.8-extra-options.txt
+
+          echo ""
+
           bash configure \
             --openjdk-target=aarch64-none-elf \
             --with-toolchain-type=gcc \
             --with-boot-jdk=/opt/bootjdk \
+            --with-debug-level=release \
+            $EXTRA_OPTIONS \
             CC=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-gcc \
             CXX=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-g++ \
             AR=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-ar \
             NM=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-nm \
             OBJCOPY=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-objcopy \
             STRIP=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-strip \
-            2>&1 | tee ../horizon-research/configure-v0.7.log
+            2>&1 \
+            | tee ../horizon-research/configure-v0.8.log
 
           STATUS=${PIPESTATUS[0]}
 
@@ -639,18 +713,16 @@ jobs:
             > ../horizon-research/configure-exit-code.txt
 
           echo ""
-          echo "========================================"
-          echo " Configure exit code: $STATUS"
-          echo "========================================"
+          echo "Configure exit code: $STATUS"
 
           exit 0
 
 
       # ============================================================
-      # 15. Summary
+      # 18. Analise
       # ============================================================
 
-      - name: Analyze v0.7 result
+      - name: Analyze minimal headless configure
         shell: bash
         run: |
           set -e
@@ -658,14 +730,23 @@ jobs:
           {
             echo "========================================"
             echo " Minecraft-NX"
-            echo " OpenJDK Horizon Research v0.7"
+            echo " OpenJDK Horizon Research v0.8"
             echo " Created by Farbert_Took"
             echo "========================================"
+
+            echo ""
+            echo "Strategy:"
+            echo "Horizon + AArch64 + headless + minimal JVM"
 
             echo ""
             echo "Boot JDK:"
 
             "$BOOT_JDK/bin/java" -version 2>&1
+
+            echo ""
+            echo "Requested extra configure options:"
+
+            cat horizon-research/v0.8-extra-options.txt
 
             echo ""
             echo "Configure exit code:"
@@ -677,23 +758,23 @@ jobs:
             echo ""
 
             grep -i -E \
-              'error|warning|unsupported|horizon|target|host|aarch64|elf|sysroot|compiler|toolchain|boot jdk|bootjdk|cups|fontconfig|freetype|alsa|x11|libx|libc|posix|linux|library|libraries|header|headers|jpeg|gif|png|zlib' \
-              horizon-research/configure-v0.7.log \
-              | tail -n 1200 \
+              'error|warning|unsupported|horizon|target|host|aarch64|elf|headless|minimal|jvm variant|jvm features|cups|fontconfig|freetype|alsa|x11|xext|xrender|xtst|xi|libffi|sysroot|posix|linux|library|libraries|header|headers' \
+              horizon-research/configure-v0.8.log \
+              | tail -n 1600 \
               || true
 
-          } > horizon-research/summary-v0.7.txt
+          } > horizon-research/summary-v0.8.txt
 
           echo ""
           echo "========================================"
-          echo " SUMMARY v0.7"
+          echo " SUMMARY v0.8"
           echo "========================================"
 
-          cat horizon-research/summary-v0.7.txt
+          cat horizon-research/summary-v0.8.txt
 
 
       # ============================================================
-      # 16. Ultimas linhas sem filtro
+      # 19. Tail bruto
       # ============================================================
 
       - name: Show configure tail
@@ -703,82 +784,156 @@ jobs:
 
           echo ""
           echo "========================================"
-          echo " LAST 300 CONFIGURE LINES"
+          echo " LAST 400 CONFIGURE LINES"
           echo "========================================"
 
           tail \
-            -n 300 \
-            horizon-research/configure-v0.7.log \
-            | tee horizon-research/configure-tail-v0.7.txt
+            -n 400 \
+            horizon-research/configure-v0.8.log \
+            | tee horizon-research/configure-tail-v0.8.txt
 
 
       # ============================================================
-      # 17. Procura outras dependencias desktop
+      # 20. Se configure funcionar, NAO fazemos build completo.
+      #
+      # Apenas pedimos ao Make para listar/alcançar o target HotSpot
+      # e capturamos a primeira falha real do port.
       # ============================================================
 
-      - name: Inspect next desktop dependencies
+      - name: Probe HotSpot build
+        shell: bash
+        run: |
+          set +e
+
+          STATUS=$(cat horizon-research/configure-exit-code.txt)
+
+          if [ "$STATUS" != "0" ]; then
+
+            echo "Configure ainda nao terminou com sucesso." \
+              | tee horizon-research/hotspot-probe.txt
+
+            echo "HotSpot build nao iniciado." \
+              | tee -a horizon-research/hotspot-probe.txt
+
+            exit 0
+          fi
+
+          echo "Configure OK." \
+            | tee horizon-research/hotspot-probe.txt
+
+          echo "Iniciando somente probe do target hotspot..." \
+            | tee -a horizon-research/hotspot-probe.txt
+
+          cd openjdk21
+
+          make hotspot \
+            2>&1 \
+            | tee ../horizon-research/hotspot-build-v0.8.log
+
+          MAKE_STATUS=${PIPESTATUS[0]}
+
+          echo "$MAKE_STATUS" \
+            > ../horizon-research/hotspot-exit-code.txt
+
+          exit 0
+
+
+      # ============================================================
+      # 21. Analisa primeira falha real do HotSpot
+      # ============================================================
+
+      - name: Analyze HotSpot probe
+        shell: bash
+        run: |
+          set +e
+
+          if [ -f horizon-research/hotspot-build-v0.8.log ]; then
+
+            {
+              echo "========================================"
+              echo " HOTSPOT PROBE v0.8"
+              echo "========================================"
+
+              echo ""
+
+              grep -i -E \
+                'error|fatal|horizon|os_cpu|os/|aarch64|missing|not found|no rule|undefined|unsupported' \
+                horizon-research/hotspot-build-v0.8.log \
+                | tail -n 1200
+
+              echo ""
+              echo "===== LAST 300 ====="
+
+              tail \
+                -n 300 \
+                horizon-research/hotspot-build-v0.8.log
+
+            } > horizon-research/hotspot-summary-v0.8.txt
+
+            cat horizon-research/hotspot-summary-v0.8.txt
+
+          else
+
+            echo \
+              "HotSpot probe nao executado porque configure ainda falhou." \
+              > horizon-research/hotspot-summary-v0.8.txt
+
+          fi
+
+          exit 0
+
+
+      # ============================================================
+      # 22. Procura arquivos que seriam necessarios para Horizon
+      # ============================================================
+
+      - name: Prepare Horizon port map
         shell: bash
         run: |
           set +e
 
           {
             echo "Minecraft-NX"
-            echo "OpenJDK Horizon Research v0.7"
+            echo "OpenJDK Horizon Port Map v0.8"
             echo "Created by Farbert_Took"
 
             echo ""
-            echo "===== DESKTOP LIBRARY REFERENCES ====="
+            echo "===== Linux AArch64 HotSpot reference ====="
 
-            grep -R -n -E \
-              'ALSA|X11|Xext|Xrender|Xtst|Xi|freetype|fontconfig|cups|harfbuzz' \
-              openjdk21/make/autoconf \
-              | head -n 3000
+            find \
+              openjdk21/src/hotspot/os/linux \
+              openjdk21/src/hotspot/os_cpu/linux_aarch64 \
+              -maxdepth 1 \
+              -type f \
+              -printf '%p\n' \
+              2>/dev/null \
+              | sort
 
-          } > horizon-research/desktop-library-references.txt
+            echo ""
+            echo "===== BSD HotSpot reference ====="
+
+            find \
+              openjdk21/src/hotspot/os/bsd \
+              openjdk21/src/hotspot/os_cpu/bsd_aarch64 \
+              -maxdepth 1 \
+              -type f \
+              -printf '%p\n' \
+              2>/dev/null \
+              | sort
+
+            echo ""
+            echo "===== Potential Horizon directories ====="
+
+            echo "src/hotspot/os/horizon"
+            echo "src/hotspot/os_cpu/horizon_aarch64"
+
+          } > horizon-research/horizon-port-map.txt
 
           exit 0
 
 
       # ============================================================
-      # 18. HotSpot OS ports
-      # ============================================================
-
-      - name: Record HotSpot ports
-        shell: bash
-        run: |
-          set -e
-
-          {
-            echo "===== HotSpot OS ports ====="
-            echo ""
-
-            find \
-              openjdk21/src/hotspot/os \
-              -mindepth 1 \
-              -maxdepth 1 \
-              -type d \
-              -printf '%f\n' \
-              | sort
-
-            echo ""
-            echo "===== HotSpot OS/CPU ports ====="
-            echo ""
-
-            find \
-              openjdk21/src/hotspot/os_cpu \
-              -mindepth 1 \
-              -maxdepth 1 \
-              -type d \
-              -printf '%f\n' \
-              | sort
-
-          } > horizon-research/hotspot-ports.txt
-
-          cat horizon-research/hotspot-ports.txt
-
-
-      # ============================================================
-      # 19. Coleta config.log
+      # 23. Coleta logs de configuracao
       # ============================================================
 
       - name: Collect configuration logs
@@ -815,10 +970,10 @@ jobs:
 
 
       # ============================================================
-      # 20. Resultado final
+      # 24. Resultado
       # ============================================================
 
-      - name: Final v0.7 report
+      - name: Final v0.8 report
         shell: bash
         run: |
           set -e
@@ -826,12 +981,24 @@ jobs:
           echo ""
           echo "========================================"
           echo " Minecraft-NX"
-          echo " OpenJDK Horizon Research v0.7"
+          echo " OpenJDK Horizon Research v0.8"
           echo " Created by Farbert_Took"
           echo "========================================"
 
           echo ""
-          echo "Arquivos coletados:"
+          echo "Configure:"
+          cat horizon-research/configure-exit-code.txt
+
+          echo ""
+          echo "Headless option detected:"
+          echo "$HEADLESS_OPTION"
+
+          echo ""
+          echo "JVM variant option detected:"
+          echo "$JVM_VARIANT_OPTION"
+
+          echo ""
+          echo "Research files:"
           echo ""
 
           find \
@@ -842,18 +1009,16 @@ jobs:
             | sort
 
           echo ""
-          echo "Os bypasses CUPS/Fontconfig sao de pesquisa."
-          echo "Eles nao implementam essas bibliotecas no Horizon."
-          echo ""
-          echo "Ainda nao temos uma JVM OpenJDK funcional."
+          echo "v0.8 nao afirma que OpenJDK suporta Horizon."
+          echo "Objetivo: localizar a fronteira real do port."
 
 
       # ============================================================
-      # 21. Artifact
+      # 25. Artifact
       # ============================================================
 
-      - name: Upload Horizon Research v0.7
+      - name: Upload Horizon Research v0.8
         uses: actions/upload-artifact@v4
         with:
-          name: Minecraft-NX-Farbert_Took-OpenJDK-Horizon-v0.7
+          name: Minecraft-NX-Farbert_Took-OpenJDK-Horizon-v0.8
           path: horizon-research
