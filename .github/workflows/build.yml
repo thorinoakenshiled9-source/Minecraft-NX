@@ -14,25 +14,17 @@ jobs:
       image: devkitpro/devkita64:latest
 
     steps:
-      - name: Checkout Minecraft-NX
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Build Minecraft-NX
-        run: |
-          make -j2
-
-      - name: Verify Minecraft-NX
-        run: |
-          echo "=== Minecraft-NX ==="
-          ls -lh Minecraft-NX.nro
-          test -f Minecraft-NX.nro
+        run: make -j2
 
       - name: Upload Minecraft-NX
         uses: actions/upload-artifact@v4
         with:
           name: Minecraft-NX-nro
           path: Minecraft-NX.nro
-
 
   java-test:
     runs-on: ubuntu-latest
@@ -46,13 +38,70 @@ jobs:
           apt-get update
           apt-get install -y git python3 maven
 
-      - name: Clone javm-nx-poc
+      - name: Clone JavaVM
         run: |
           git clone --recursive https://github.com/XorTroll/javm-nx-poc.git
 
-      # ------------------------------------------------------------
-      # Compatibilidade com GCC/libnx atuais
-      # ------------------------------------------------------------
-
-      - name: Patch JavaVM compatibility
+      - name: Patch JavaVM
         shell: bash
+        run: |
+          python3 -c 'from pathlib import Path; root=Path("javm-nx-poc"); files=[root/"libjavm/libjavm/include/javm/core/core_ClassObject.hpp",root/"libjavm/libjavm/include/javm/core/core_ManifestFile.hpp"]; [(p.write_text(("#include <algorithm>\n" if "#include <algorithm>" not in p.read_text() else "")+p.read_text())) for p in files]; p=root/"nx/native/nx_Java.hpp"; s=p.read_text(); p.write_text("\n".join(line for line in s.splitlines() if "Input.class.hpp" not in line and "LoadNativeClass<hid::Input>" not in line)+"\n")'
+
+      - name: Patch diagnostic
+        shell: bash
+        run: |
+          python3 -c 'from pathlib import Path; p=Path("javm-nx-poc/javm/source/Main.cpp"); s=p.read_text(); print(s); p.write_text(s.replace("consoleExit(NULL);", "printf(\"\\n[DEBUG] JavaVM chegou ao final do main.\\nUse HOME para sair.\\n\"); consoleUpdate(NULL); while (appletMainLoop()) { consoleUpdate(NULL); } consoleExit(NULL);"))'
+
+      - name: Show patched Main
+        run: |
+          echo "=== Main.cpp PATCHED ==="
+          cat javm-nx-poc/javm/source/Main.cpp
+
+      - name: Build JavaVM
+        working-directory: javm-nx-poc/javm
+        run: make -j2
+
+      - name: Build nx Java library
+        working-directory: javm-nx-poc/nx/java
+        run: mvn package
+
+      - name: Build Java Hello World
+        working-directory: javm-nx-poc/java-hello-world
+        run: mvn package
+
+      - name: Show generated files
+        run: |
+          echo "=== NRO ==="
+          find javm-nx-poc -type f -name "*.nro" -print
+          echo "=== JAR ==="
+          find javm-nx-poc -type f -name "*.jar" -print
+          echo "=== SD OUT ==="
+          find javm-nx-poc/sd_out -type f -print || true
+
+      - name: Prepare SD package
+        shell: bash
+        run: |
+          set -e
+          rm -rf SD
+          mkdir -p SD
+
+          cp -r javm-nx-poc/sd_out/. SD/
+
+          HELLO_JAR=$(find javm-nx-poc/java-hello-world/target -maxdepth 1 -type f -name "*.jar" | head -n 1)
+
+          if [ -z "$HELLO_JAR" ]; then
+            echo "Hello World JAR nao encontrado"
+            exit 1
+          fi
+
+          mkdir -p SD/switch
+          cp "$HELLO_JAR" SD/switch/java-hello-world.jar
+
+          echo "=== PACOTE FINAL ==="
+          find SD -type f -print
+
+      - name: Verify SD package
+        run: |
+          test -f SD/switch/javm/javm.nro
+          test -f SD/switch/java-hello-world.jar
+          test -f SD/config/nx-hbmenu/fileassoc
