@@ -1,4 +1,4 @@
-name: OpenJDK Horizon Research v0.5
+name: OpenJDK Horizon Research v0.6
 
 on:
   workflow_dispatch:
@@ -19,36 +19,38 @@ jobs:
 
       # ============================================================
       # Minecraft-NX
-      # OpenJDK / Horizon Research v0.5
+      # OpenJDK / Horizon Research v0.6
       # Created by Farbert_Took
       #
-      # Estado confirmado no v0.4:
+      # Confirmado:
       #
-      #   aarch64-none-elf
-      #          ↓
-      #   horizon-aarch64             OK
-      #          ↓
-      #   Boot JDK 20                 OK
-      #          ↓
-      #   devkitA64 GCC/G++           OK
-      #          ↓
-      #   target 64-bit               OK
-      #          ↓
-      #   CUPS                        <- v0.5
+      #   Horizon target recognition       OK
+      #   horizon-aarch64                  OK
+      #   Boot JDK 20                      OK
+      #   devkitA64 GCC/G++                OK
+      #   Cross compilation                OK
+      #   Target 64-bit                    OK
       #
-      # Objetivo:
-      # ultrapassar a verificacao de CUPS e descobrir
-      # a proxima barreira real do configure.
+      # v0.5 mostrou que CUPS do Linux host nao pode simplesmente
+      # ser usado pelo compilador Horizon.
       #
-      # Ainda NAO esperamos gerar JVM/NRO funcional.
+      # v0.6:
+      #
+      #   - identifica a checagem CUPS
+      #   - desativa CUPS especificamente para Horizon
+      #   - NAO linka libcups Linux ao target
+      #   - continua o configure
+      #   - captura a proxima barreira
+      #
+      # Ainda NAO esperamos uma JVM/NRO funcional.
       # ============================================================
 
 
       # ============================================================
-      # 1. Ferramentas + CUPS
+      # 1. Ferramentas
       # ============================================================
 
-      - name: Install research tools and CUPS
+      - name: Install research tools
         shell: bash
         run: |
           set -e
@@ -73,18 +75,18 @@ jobs:
             grep \
             sed \
             gawk \
-            libcups2-dev
+            pkg-config
 
           echo ""
           echo "========================================"
           echo " Minecraft-NX"
-          echo " OpenJDK Horizon Research v0.5"
+          echo " OpenJDK Horizon Research v0.6"
           echo " Created by Farbert_Took"
           echo "========================================"
 
 
       # ============================================================
-      # 2. PATH devkitA64
+      # 2. devkitA64 PATH
       # ============================================================
 
       - name: Configure devkitA64 PATH
@@ -96,7 +98,7 @@ jobs:
           echo "/opt/devkitpro/tools/bin" >> "$GITHUB_PATH"
 
           echo ""
-          echo "devkitA64 adicionado ao PATH."
+          echo "devkitA64 PATH configurado."
 
 
       # ============================================================
@@ -127,7 +129,7 @@ jobs:
 
 
       # ============================================================
-      # 4. Diretorio de pesquisa
+      # 4. Research directory
       # ============================================================
 
       - name: Prepare research directory
@@ -140,13 +142,13 @@ jobs:
 
           {
             echo "Minecraft-NX"
-            echo "OpenJDK Horizon Research v0.5"
+            echo "OpenJDK Horizon Research v0.6"
             echo "Created by Farbert_Took"
           } > horizon-research/info.txt
 
 
       # ============================================================
-      # 5. Confirma compilacao AArch64 + libnx
+      # 5. Teste libnx
       # ============================================================
 
       - name: Verify Horizon compilation
@@ -182,52 +184,7 @@ jobs:
 
 
       # ============================================================
-      # 6. Verifica CUPS instalado
-      # ============================================================
-
-      - name: Verify CUPS development files
-        shell: bash
-        run: |
-          set -e
-
-          echo ""
-          echo "===== CUPS PACKAGES ====="
-
-          dpkg -l | grep cups || true
-
-          echo ""
-          echo "===== CUPS HEADERS ====="
-
-          find /usr/include \
-            -maxdepth 3 \
-            -path '*cups*' \
-            -type f \
-            | head -n 100 \
-            || true
-
-          echo ""
-          echo "===== pkg-config CUPS ====="
-
-          pkg-config \
-            --modversion cups \
-            2>/dev/null \
-            || true
-
-          {
-            echo "CUPS development package:"
-            dpkg -l | grep libcups || true
-
-            echo ""
-            echo "CUPS pkg-config:"
-            pkg-config --modversion cups 2>/dev/null || true
-          } > horizon-research/cups-info.txt
-
-
-      # ============================================================
-      # 7. Boot JDK 20
-      #
-      # Roda no Linux x86_64 do GitHub Actions.
-      # NAO e o Java destinado ao Switch.
+      # 6. Boot JDK 20
       # ============================================================
 
       - name: Download Boot JDK 20
@@ -249,7 +206,7 @@ jobs:
             "https://api.adoptium.net/v3/binary/latest/20/ga/linux/x64/jdk/hotspot/normal/eclipse"
 
           echo ""
-          echo "Extraindo Boot JDK..."
+          echo "Extraindo..."
 
           tar \
             -xzf /tmp/bootjdk.tar.gz \
@@ -257,18 +214,14 @@ jobs:
             --strip-components=1
 
           echo ""
-          echo "===== JAVA ====="
+          echo "===== BOOT JDK ====="
 
           "$BOOT_JDK/bin/java" -version
-
-          echo ""
-          echo "===== JAVAC ====="
-
           "$BOOT_JDK/bin/javac" -version
 
 
       # ============================================================
-      # 8. Valida Boot JDK
+      # 7. Valida Boot JDK
       # ============================================================
 
       - name: Verify Boot JDK
@@ -293,7 +246,7 @@ jobs:
 
 
       # ============================================================
-      # 9. OpenJDK 21
+      # 8. OpenJDK 21
       # ============================================================
 
       - name: Clone OpenJDK 21
@@ -316,13 +269,12 @@ jobs:
 
 
       # ============================================================
-      # 10. Patch Horizon
+      # 9. Patch de reconhecimento Horizon
       #
-      # Mantemos o patch que funcionou no v0.3/v0.4:
+      # Mantemos:
       #
-      #       elf -> horizon
+      #     elf -> horizon
       #
-      # NAO estamos fingindo que Horizon e Linux.
       # ============================================================
 
       - name: Add Horizon OS mapping
@@ -396,35 +348,205 @@ jobs:
 
 
       # ============================================================
-      # 11. Salva patch
+      # 10. Localiza implementacao CUPS
       # ============================================================
 
-      - name: Save Horizon patch
+      - name: Inspect OpenJDK CUPS checks
+        shell: bash
+        run: |
+          set -e
+
+          echo ""
+          echo "===== CUPS CONFIGURE REFERENCES ====="
+
+          grep -R -n -E \
+            'Could not find cups|cups/cups.h|cups/ppd.h|CUPS_FOUND|CUPS_CFLAGS|CUPS_LIBS' \
+            openjdk21/make/autoconf \
+            2>/dev/null \
+            | tee horizon-research/cups-configure-search.txt \
+            || true
+
+          echo ""
+          echo "===== CUPS SOURCE REFERENCES ====="
+
+          grep -R -n \
+            '#include <cups/' \
+            openjdk21/src \
+            2>/dev/null \
+            | head -n 300 \
+            | tee horizon-research/cups-source-search.txt \
+            || true
+
+
+      # ============================================================
+      # 11. Patch CUPS para Horizon
+      #
+      # IMPORTANTE:
+      #
+      # Nao adicionamos /usr/include/cups ao cross compiler.
+      # Nao adicionamos -lcups do Linux.
+      #
+      # Em vez disso, para o target Horizon, pulamos a verificacao
+      # da biblioteca de impressao.
+      #
+      # Este e um patch de pesquisa. Mais tarde o modulo desktop
+      # precisara ser configurado/portado corretamente.
+      # ============================================================
+
+      - name: Disable CUPS requirement for Horizon
+        shell: bash
+        run: |
+          set -e
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path("openjdk21/make/autoconf")
+
+          candidates = []
+
+          for p in root.rglob("*.m4"):
+              text = p.read_text(errors="ignore")
+
+              if (
+                  "Could not find cups" in text
+                  or "cups/cups.h" in text
+                  or "CUPS_FOUND" in text
+              ):
+                  candidates.append(p)
+
+          if not candidates:
+              raise SystemExit(
+                  "Nao encontrei arquivo de configuracao CUPS"
+              )
+
+          print("Arquivos CUPS encontrados:")
+
+          for p in candidates:
+              print(" -", p)
+
+          target = None
+
+          for p in candidates:
+              text = p.read_text(errors="ignore")
+
+              if "Could not find cups" in text:
+                  target = p
+                  break
+
+          if target is None:
+              raise SystemExit(
+                  "Nao encontrei a mensagem fatal de CUPS"
+              )
+
+          text = target.read_text()
+
+          marker = 'AC_MSG_ERROR([Could not find cups!'
+
+          pos = text.find(marker)
+
+          if pos < 0:
+              # Fallback para pequenas mudancas no texto.
+              pos = text.find("Could not find cups")
+
+          if pos < 0:
+              raise SystemExit(
+                  "Nao localizei a checagem fatal CUPS"
+              )
+
+          # Localiza a linha completa contendo o erro.
+          line_start = text.rfind("\n", 0, pos) + 1
+          line_end = text.find("\n", pos)
+
+          if line_end < 0:
+              line_end = len(text)
+
+          original_line = text[line_start:line_end]
+
+          indent = original_line[
+              :len(original_line) - len(original_line.lstrip())
+          ]
+
+          replacement = (
+              indent
+              + 'if test "x$OPENJDK_TARGET_OS" = "xhorizon"; then\n'
+              + indent
+              + '  AC_MSG_WARN([CUPS disabled for experimental Horizon target])\n'
+              + indent
+              + '  CUPS_CFLAGS=""\n'
+              + indent
+              + '  CUPS_LIBS=""\n'
+              + indent
+              + 'else\n'
+              + original_line
+              + '\n'
+              + indent
+              + 'fi'
+          )
+
+          text = (
+              text[:line_start]
+              + replacement
+              + text[line_end:]
+          )
+
+          target.write_text(text)
+
+          Path(
+              "horizon-research/cups-patched-file.txt"
+          ).write_text(str(target) + "\n")
+
+          print()
+          print("Patch CUPS aplicado em:", target)
+          print()
+          print("Linha original:")
+          print(original_line)
+          PY
+
+          echo ""
+          echo "===== CUPS PATCH CONTEXT ====="
+
+          CUPS_FILE=$(cat horizon-research/cups-patched-file.txt)
+
+          grep \
+            -n \
+            -C 20 \
+            'CUPS disabled for experimental Horizon target' \
+            "$CUPS_FILE" \
+            | tee horizon-research/cups-patch-context.txt
+
+
+      # ============================================================
+      # 12. Salva patch completo
+      # ============================================================
+
+      - name: Save OpenJDK Horizon v0.6 patch
         shell: bash
         run: |
           set -e
 
           git -C openjdk21 diff \
-            > horizon-research/openjdk-horizon-v0.5.patch
+            > horizon-research/openjdk-horizon-v0.6.patch
 
           echo ""
-          echo "===== OPENJDK HORIZON PATCH ====="
+          echo "========================================"
+          echo " PATCH v0.6"
+          echo "========================================"
 
-          cat horizon-research/openjdk-horizon-v0.5.patch
+          cat horizon-research/openjdk-horizon-v0.6.patch
 
 
       # ============================================================
-      # 12. Configure
+      # 13. Configure
       #
-      # Esperamos ultrapassar:
+      # Esperado:
       #
-      # Could not find cups!
+      # CUPS disabled for experimental Horizon target
       #
-      # Uma nova falha e aceitavel e desejada:
-      # queremos descobrir a proxima dependencia/barreira.
+      # seguido de uma nova verificacao/barreira.
       # ============================================================
 
-      - name: Probe OpenJDK after CUPS
+      - name: Probe OpenJDK after Horizon CUPS patch
         shell: bash
         run: |
           set +e
@@ -441,7 +563,7 @@ jobs:
             NM=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-nm \
             OBJCOPY=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-objcopy \
             STRIP=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-strip \
-            2>&1 | tee ../horizon-research/configure-v0.5.log
+            2>&1 | tee ../horizon-research/configure-v0.6.log
 
           STATUS=${PIPESTATUS[0]}
 
@@ -457,10 +579,10 @@ jobs:
 
 
       # ============================================================
-      # 13. Summary
+      # 14. Summary
       # ============================================================
 
-      - name: Analyze v0.5 result
+      - name: Analyze v0.6 result
         shell: bash
         run: |
           set -e
@@ -468,16 +590,18 @@ jobs:
           {
             echo "========================================"
             echo " Minecraft-NX"
-            echo " OpenJDK Horizon Research v0.5"
+            echo " OpenJDK Horizon Research v0.6"
             echo " Created by Farbert_Took"
             echo "========================================"
 
             echo ""
             echo "Boot JDK:"
+
             "$BOOT_JDK/bin/java" -version 2>&1
 
             echo ""
             echo "Configure exit code:"
+
             cat horizon-research/configure-exit-code.txt
 
             echo ""
@@ -485,26 +609,23 @@ jobs:
             echo ""
 
             grep -i -E \
-              'error|warning|unsupported|horizon|target|host|aarch64|elf|sysroot|compiler|toolchain|boot jdk|bootjdk|cups|freetype|fontconfig|alsa|x11|libc|posix|linux|library|libraries|header|headers' \
-              horizon-research/configure-v0.5.log \
-              | tail -n 700 \
+              'error|warning|unsupported|horizon|target|host|aarch64|elf|sysroot|compiler|toolchain|boot jdk|bootjdk|cups|freetype|fontconfig|alsa|x11|libc|posix|linux|library|libraries|header|headers|jpeg|gif|png|zlib' \
+              horizon-research/configure-v0.6.log \
+              | tail -n 1000 \
               || true
 
-          } > horizon-research/summary-v0.5.txt
+          } > horizon-research/summary-v0.6.txt
 
           echo ""
           echo "========================================"
-          echo " SUMMARY v0.5"
+          echo " SUMMARY v0.6"
           echo "========================================"
 
-          cat horizon-research/summary-v0.5.txt
+          cat horizon-research/summary-v0.6.txt
 
 
       # ============================================================
-      # 14. Ultimas linhas completas
-      #
-      # Isso ajuda caso o proximo erro nao corresponda aos termos
-      # filtrados acima.
+      # 15. Ultimas 250 linhas
       # ============================================================
 
       - name: Show configure tail
@@ -514,61 +635,53 @@ jobs:
 
           echo ""
           echo "========================================"
-          echo " LAST 150 CONFIGURE LINES"
+          echo " LAST 250 CONFIGURE LINES"
           echo "========================================"
 
           tail \
-            -n 150 \
-            horizon-research/configure-v0.5.log \
-            | tee horizon-research/configure-tail-v0.5.txt
+            -n 250 \
+            horizon-research/configure-v0.6.log \
+            | tee horizon-research/configure-tail-v0.6.txt
 
 
       # ============================================================
-      # 15. Investiga condicionais de OS
+      # 16. Procura novas dependencias
       # ============================================================
 
-      - name: Inspect next Horizon barriers
+      - name: Inspect native library checks
         shell: bash
         run: |
           set +e
 
           {
             echo "Minecraft-NX"
-            echo "OpenJDK Horizon Research v0.5"
+            echo "OpenJDK Horizon Research v0.6"
             echo "Created by Farbert_Took"
 
             echo ""
-            echo "===== OPENJDK_TARGET_OS ====="
-
-            grep -R -n \
-              'OPENJDK_TARGET_OS' \
-              openjdk21/make/autoconf \
-              | head -n 1500
-
-            echo ""
-            echo "===== FIXED OS LISTS ====="
+            echo "===== LIBRARY CHECKS ====="
 
             grep -R -n -E \
-              'linux.*macosx|linux.*windows|linux.*aix|linux.*bsd|SUPPORTED_OS|VALID_OS' \
+              'AC_CHECK_HEADERS|AC_CHECK_LIB|PKG_CHECK_MODULES|AC_MSG_ERROR.*find|AC_MSG_ERROR.*library' \
               openjdk21/make/autoconf \
-              | head -n 1500
+              | head -n 2500
 
-          } > horizon-research/next-horizon-barriers.txt
+          } > horizon-research/native-library-checks.txt
 
           exit 0
 
 
       # ============================================================
-      # 16. HotSpot ports existentes
+      # 17. Investiga codigo nativo que ja depende de OS
       # ============================================================
 
-      - name: Record HotSpot ports
+      - name: Inspect Horizon source requirements
         shell: bash
         run: |
-          set -e
+          set +e
 
           {
-            echo "===== HotSpot OS ports ====="
+            echo "===== HOTSPOT OS PORTS ====="
             echo ""
 
             find \
@@ -580,7 +693,7 @@ jobs:
               | sort
 
             echo ""
-            echo "===== HotSpot OS/CPU ports ====="
+            echo "===== HOTSPOT OS CPU PORTS ====="
             echo ""
 
             find \
@@ -591,13 +704,29 @@ jobs:
               -printf '%f\n' \
               | sort
 
-          } > horizon-research/hotspot-ports.txt
+            echo ""
+            echo "===== JDK UNIX SOURCES ====="
+            echo ""
 
-          cat horizon-research/hotspot-ports.txt
+            find \
+              openjdk21/src \
+              -type d \
+              \( \
+                -name linux \
+                -o \
+                -name unix \
+                -o \
+                -name posix \
+              \) \
+              | head -n 500
+
+          } > horizon-research/horizon-source-requirements.txt
+
+          exit 0
 
 
       # ============================================================
-      # 17. Coleta config logs
+      # 18. Coleta config.log
       # ============================================================
 
       - name: Collect configuration logs
@@ -634,10 +763,10 @@ jobs:
 
 
       # ============================================================
-      # 18. Resultado final
+      # 19. Resultado
       # ============================================================
 
-      - name: Final v0.5 report
+      - name: Final v0.6 report
         shell: bash
         run: |
           set -e
@@ -645,7 +774,7 @@ jobs:
           echo ""
           echo "========================================"
           echo " Minecraft-NX"
-          echo " OpenJDK Horizon Research v0.5"
+          echo " OpenJDK Horizon Research v0.6"
           echo " Created by Farbert_Took"
           echo "========================================"
 
@@ -661,16 +790,20 @@ jobs:
             | sort
 
           echo ""
-          echo "Esta ainda e uma build de pesquisa."
-          echo "Nao gera Minecraft-NX.nro nesta etapa."
+          echo "IMPORTANTE:"
+          echo ""
+          echo "O bypass CUPS desta versao e apenas para pesquisa."
+          echo "Ele nao significa que CUPS funciona no Horizon."
+          echo ""
+          echo "Ainda nao geramos uma JVM/NRO funcional."
 
 
       # ============================================================
-      # 19. Artifact
+      # 20. Artifact
       # ============================================================
 
-      - name: Upload Horizon Research v0.5
+      - name: Upload Horizon Research v0.6
         uses: actions/upload-artifact@v4
         with:
-          name: Minecraft-NX-Farbert_Took-OpenJDK-Horizon-v0.5
+          name: Minecraft-NX-Farbert_Took-OpenJDK-Horizon-v0.6
           path: horizon-research
