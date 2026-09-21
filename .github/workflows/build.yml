@@ -1,4 +1,4 @@
-name: Build Minecraft-NX JavaVM
+name: Build Minecraft-NX Java Test
 
 on:
   push:
@@ -25,7 +25,7 @@ jobs:
           name: Minecraft-NX-nro
           path: Minecraft-NX.nro
 
-  javm:
+  java-test:
     runs-on: ubuntu-latest
     container:
       image: devkitpro/devkita64:latest
@@ -34,13 +34,13 @@ jobs:
       - name: Install tools
         run: |
           apt-get update
-          apt-get install -y git python3
+          apt-get install -y git python3 maven
 
-      - name: Clone JavaVM
+      - name: Clone javm
         run: |
           git clone --recursive https://github.com/XorTroll/javm-nx-poc.git
 
-      - name: Patch JavaVM
+      - name: Patch javm
         shell: bash
         run: |
           python3 <<'PY'
@@ -48,21 +48,20 @@ jobs:
 
           root = Path("javm-nx-poc")
 
-          files = [
-              root / "libjavm/libjavm/include/javm/core/core_ClassObject.hpp",
-              root / "libjavm/libjavm/include/javm/core/core_ManifestFile.hpp",
-          ]
-
-          for path in files:
-              text = path.read_text()
+          for name in [
+              "libjavm/libjavm/include/javm/core/core_ClassObject.hpp",
+              "libjavm/libjavm/include/javm/core/core_ManifestFile.hpp"
+          ]:
+              p = root / name
+              text = p.read_text()
 
               if "#include <algorithm>" not in text:
                   text = "#include <algorithm>\n" + text
 
-              path.write_text(text)
+              p.write_text(text)
 
-          path = root / "nx/native/nx_Java.hpp"
-          text = path.read_text()
+          p = root / "nx/native/nx_Java.hpp"
+          text = p.read_text()
 
           lines = []
 
@@ -75,31 +74,62 @@ jobs:
 
               lines.append(line)
 
-          path.write_text("\n".join(lines) + "\n")
+          p.write_text("\n".join(lines) + "\n")
 
-          print("Patch aplicado.")
-          print()
-          print("=== nx_Java.hpp ===")
-          print(path.read_text())
+          print("Patch concluido")
           PY
 
-      - name: Build JavaVM
+      - name: Build javm NRO
         working-directory: javm-nx-poc/javm
         run: make -j2
 
-      - name: Find JavaVM
+      - name: Build nx Java library
+        working-directory: javm-nx-poc/nx/java
+        run: mvn package
+
+      - name: Build Java Hello World
+        working-directory: javm-nx-poc/java-hello-world
+        run: mvn package
+
+      - name: Show generated files
         run: |
-          echo "=== NRO encontrados ==="
+          echo "=== NRO ==="
           find javm-nx-poc -type f -name "*.nro" -print
 
-      - name: Prepare artifact
-        run: |
-          mkdir -p output
-          find javm-nx-poc -type f -name "*.nro" -exec cp {} output/ \;
-          ls -lah output
+          echo "=== JAR ==="
+          find javm-nx-poc -type f -name "*.jar" -print
 
-      - name: Upload JavaVM
+          echo "=== SD OUT ==="
+          find javm-nx-poc/sd_out -type f -print
+
+      - name: Prepare SD package
+        shell: bash
+        run: |
+          mkdir -p SD
+
+          cp -r javm-nx-poc/sd_out/. SD/
+
+          HELLO_JAR=$(find javm-nx-poc/java-hello-world/target \
+            -maxdepth 1 \
+            -type f \
+            -name "*.jar" \
+            | head -n 1)
+
+          if [ -z "$HELLO_JAR" ]; then
+            echo "Hello World JAR nao encontrado"
+            exit 1
+          fi
+
+          mkdir -p SD/switch
+
+          cp "$HELLO_JAR" \
+            SD/switch/java-hello-world.jar
+
+          echo "=== PACOTE FINAL ==="
+          find SD -type f -print
+
+      - name: Upload SD package
         uses: actions/upload-artifact@v4
         with:
-          name: Minecraft-NX-JavaVM
-          path: output
+          name: Minecraft-NX-Java-Test-SD
+          path: SD
