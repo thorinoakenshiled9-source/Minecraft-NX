@@ -1,4 +1,4 @@
-name: OpenJDK Horizon Research v0.4
+name: OpenJDK Horizon Research v0.5
 
 on:
   workflow_dispatch:
@@ -19,23 +19,36 @@ jobs:
 
       # ============================================================
       # Minecraft-NX
-      # OpenJDK / Horizon Research v0.4
+      # OpenJDK / Horizon Research v0.5
       # Created by Farbert_Took
       #
-      # Objetivo desta rodada:
+      # Estado confirmado no v0.4:
       #
       #   aarch64-none-elf
       #          ↓
-      #   horizon-aarch64          [v0.3 OK]
+      #   horizon-aarch64             OK
       #          ↓
-      #   Boot JDK                 [v0.4]
+      #   Boot JDK 20                 OK
       #          ↓
-      #   proxima barreira
+      #   devkitA64 GCC/G++           OK
+      #          ↓
+      #   target 64-bit               OK
+      #          ↓
+      #   CUPS                        <- v0.5
       #
-      # Ainda NAO esperamos gerar uma JVM/NRO funcional.
+      # Objetivo:
+      # ultrapassar a verificacao de CUPS e descobrir
+      # a proxima barreira real do configure.
+      #
+      # Ainda NAO esperamos gerar JVM/NRO funcional.
       # ============================================================
 
-      - name: Install research tools
+
+      # ============================================================
+      # 1. Ferramentas + CUPS
+      # ============================================================
+
+      - name: Install research tools and CUPS
         shell: bash
         run: |
           set -e
@@ -59,17 +72,19 @@ jobs:
             gzip \
             grep \
             sed \
-            gawk
+            gawk \
+            libcups2-dev
 
           echo ""
           echo "========================================"
           echo " Minecraft-NX"
-          echo " OpenJDK Horizon Research v0.4"
+          echo " OpenJDK Horizon Research v0.5"
           echo " Created by Farbert_Took"
           echo "========================================"
 
+
       # ============================================================
-      # devkitA64
+      # 2. PATH devkitA64
       # ============================================================
 
       - name: Configure devkitA64 PATH
@@ -79,6 +94,14 @@ jobs:
 
           echo "/opt/devkitpro/devkitA64/bin" >> "$GITHUB_PATH"
           echo "/opt/devkitpro/tools/bin" >> "$GITHUB_PATH"
+
+          echo ""
+          echo "devkitA64 adicionado ao PATH."
+
+
+      # ============================================================
+      # 3. Verifica toolchain
+      # ============================================================
 
       - name: Verify devkitA64
         shell: bash
@@ -91,6 +114,7 @@ jobs:
           test -x "$GCC"
           test -x "$GXX"
 
+          echo ""
           echo "===== GCC ====="
           "$GCC" --version
 
@@ -98,8 +122,12 @@ jobs:
           echo "===== G++ ====="
           "$GXX" --version
 
+          echo ""
+          echo "devkitA64 OK"
+
+
       # ============================================================
-      # Diretório de pesquisa
+      # 4. Diretorio de pesquisa
       # ============================================================
 
       - name: Prepare research directory
@@ -112,12 +140,13 @@ jobs:
 
           {
             echo "Minecraft-NX"
-            echo "OpenJDK Horizon Research v0.4"
+            echo "OpenJDK Horizon Research v0.5"
             echo "Created by Farbert_Took"
           } > horizon-research/info.txt
 
+
       # ============================================================
-      # Confirma libnx
+      # 5. Confirma compilacao AArch64 + libnx
       # ============================================================
 
       - name: Verify Horizon compilation
@@ -143,18 +172,62 @@ jobs:
             horizon-research/horizon_test.c \
             -o horizon-research/horizon_test.o
 
+          echo ""
+          echo "===== HORIZON OBJECT ====="
+
           file horizon-research/horizon_test.o
 
           echo ""
           echo "AArch64 + libnx OK"
 
+
       # ============================================================
-      # BOOT JDK
+      # 6. Verifica CUPS instalado
+      # ============================================================
+
+      - name: Verify CUPS development files
+        shell: bash
+        run: |
+          set -e
+
+          echo ""
+          echo "===== CUPS PACKAGES ====="
+
+          dpkg -l | grep cups || true
+
+          echo ""
+          echo "===== CUPS HEADERS ====="
+
+          find /usr/include \
+            -maxdepth 3 \
+            -path '*cups*' \
+            -type f \
+            | head -n 100 \
+            || true
+
+          echo ""
+          echo "===== pkg-config CUPS ====="
+
+          pkg-config \
+            --modversion cups \
+            2>/dev/null \
+            || true
+
+          {
+            echo "CUPS development package:"
+            dpkg -l | grep libcups || true
+
+            echo ""
+            echo "CUPS pkg-config:"
+            pkg-config --modversion cups 2>/dev/null || true
+          } > horizon-research/cups-info.txt
+
+
+      # ============================================================
+      # 7. Boot JDK 20
       #
-      # JDK 21 normalmente e bootstrapado com JDK 20.
-      #
-      # Este JDK roda no Linux x86_64 do GitHub Actions.
-      # NAO vai para o Nintendo Switch.
+      # Roda no Linux x86_64 do GitHub Actions.
+      # NAO e o Java destinado ao Switch.
       # ============================================================
 
       - name: Download Boot JDK 20
@@ -184,11 +257,6 @@ jobs:
             --strip-components=1
 
           echo ""
-          echo "===== BOOT JDK CONTENT ====="
-
-          ls -la "$BOOT_JDK"
-
-          echo ""
           echo "===== JAVA ====="
 
           "$BOOT_JDK/bin/java" -version
@@ -198,8 +266,9 @@ jobs:
 
           "$BOOT_JDK/bin/javac" -version
 
+
       # ============================================================
-      # Valida Boot JDK
+      # 8. Valida Boot JDK
       # ============================================================
 
       - name: Verify Boot JDK
@@ -209,6 +278,7 @@ jobs:
 
           test -x "$BOOT_JDK/bin/java"
           test -x "$BOOT_JDK/bin/javac"
+          test -x "$BOOT_JDK/bin/jar"
 
           "$BOOT_JDK/bin/java" -version \
             2>&1 \
@@ -221,8 +291,9 @@ jobs:
           echo ""
           echo "Boot JDK OK"
 
+
       # ============================================================
-      # OpenJDK 21
+      # 9. OpenJDK 21
       # ============================================================
 
       - name: Clone OpenJDK 21
@@ -237,16 +308,21 @@ jobs:
             https://github.com/openjdk/jdk21u.git \
             openjdk21
 
+          echo ""
+          echo "===== OPENJDK COMMIT ====="
+
           git -C openjdk21 rev-parse HEAD \
             | tee horizon-research/openjdk-commit.txt
 
+
       # ============================================================
-      # PATCH v0.3
+      # 10. Patch Horizon
       #
-      # Mantemos exatamente a ideia que funcionou:
+      # Mantemos o patch que funcionou no v0.3/v0.4:
       #
       #       elf -> horizon
       #
+      # NAO estamos fingindo que Horizon e Linux.
       # ============================================================
 
       - name: Add Horizon OS mapping
@@ -281,12 +357,15 @@ jobs:
                 ;;'''
 
           if fallback in s:
+
               s = s.replace(
                   fallback,
                   insertion + fallback,
                   1
               )
+
           else:
+
               pos = s.find(needle)
               case_start = s.rfind("*)", 0, pos)
 
@@ -315,8 +394,9 @@ jobs:
             'VAR_OS=horizon' \
             openjdk21/make/autoconf/platform.m4
 
+
       # ============================================================
-      # Confirma que nossa plataforma continua reconhecida
+      # 11. Salva patch
       # ============================================================
 
       - name: Save Horizon patch
@@ -325,20 +405,26 @@ jobs:
           set -e
 
           git -C openjdk21 diff \
-            > horizon-research/openjdk-horizon-v0.4.patch
+            > horizon-research/openjdk-horizon-v0.5.patch
 
-          cat horizon-research/openjdk-horizon-v0.4.patch
+          echo ""
+          echo "===== OPENJDK HORIZON PATCH ====="
+
+          cat horizon-research/openjdk-horizon-v0.5.patch
+
 
       # ============================================================
-      # Configure OpenJDK
+      # 12. Configure
       #
-      # NOVIDADE v0.4:
+      # Esperamos ultrapassar:
       #
-      # --with-boot-jdk=/opt/bootjdk
+      # Could not find cups!
       #
+      # Uma nova falha e aceitavel e desejada:
+      # queremos descobrir a proxima dependencia/barreira.
       # ============================================================
 
-      - name: Probe OpenJDK with Boot JDK
+      - name: Probe OpenJDK after CUPS
         shell: bash
         run: |
           set +e
@@ -355,7 +441,7 @@ jobs:
             NM=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-nm \
             OBJCOPY=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-objcopy \
             STRIP=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-strip \
-            2>&1 | tee ../horizon-research/configure-v0.4.log
+            2>&1 | tee ../horizon-research/configure-v0.5.log
 
           STATUS=${PIPESTATUS[0]}
 
@@ -369,11 +455,12 @@ jobs:
 
           exit 0
 
+
       # ============================================================
-      # Analisa a nova barreira
+      # 13. Summary
       # ============================================================
 
-      - name: Analyze v0.4 result
+      - name: Analyze v0.5 result
         shell: bash
         run: |
           set -e
@@ -381,42 +468,63 @@ jobs:
           {
             echo "========================================"
             echo " Minecraft-NX"
-            echo " OpenJDK Horizon Research v0.4"
+            echo " OpenJDK Horizon Research v0.5"
             echo " Created by Farbert_Took"
             echo "========================================"
 
             echo ""
             echo "Boot JDK:"
-
             "$BOOT_JDK/bin/java" -version 2>&1
 
             echo ""
             echo "Configure exit code:"
-
-            cat \
-              horizon-research/configure-exit-code.txt
+            cat horizon-research/configure-exit-code.txt
 
             echo ""
             echo "Relevant configure messages:"
             echo ""
 
             grep -i -E \
-              'error|warning|unsupported|horizon|target|host|aarch64|elf|sysroot|compiler|toolchain|boot jdk|bootjdk|libc|posix|linux|library|libraries|header|headers' \
-              horizon-research/configure-v0.4.log \
-              | tail -n 500 \
+              'error|warning|unsupported|horizon|target|host|aarch64|elf|sysroot|compiler|toolchain|boot jdk|bootjdk|cups|freetype|fontconfig|alsa|x11|libc|posix|linux|library|libraries|header|headers' \
+              horizon-research/configure-v0.5.log \
+              | tail -n 700 \
               || true
 
-          } > horizon-research/summary-v0.4.txt
+          } > horizon-research/summary-v0.5.txt
 
           echo ""
           echo "========================================"
-          echo " SUMMARY v0.4"
+          echo " SUMMARY v0.5"
           echo "========================================"
 
-          cat horizon-research/summary-v0.4.txt
+          cat horizon-research/summary-v0.5.txt
+
 
       # ============================================================
-      # Procura codigo do OpenJDK que trata OS especificamente
+      # 14. Ultimas linhas completas
+      #
+      # Isso ajuda caso o proximo erro nao corresponda aos termos
+      # filtrados acima.
+      # ============================================================
+
+      - name: Show configure tail
+        shell: bash
+        run: |
+          set -e
+
+          echo ""
+          echo "========================================"
+          echo " LAST 150 CONFIGURE LINES"
+          echo "========================================"
+
+          tail \
+            -n 150 \
+            horizon-research/configure-v0.5.log \
+            | tee horizon-research/configure-tail-v0.5.txt
+
+
+      # ============================================================
+      # 15. Investiga condicionais de OS
       # ============================================================
 
       - name: Inspect next Horizon barriers
@@ -426,7 +534,7 @@ jobs:
 
           {
             echo "Minecraft-NX"
-            echo "OpenJDK Horizon Research v0.4"
+            echo "OpenJDK Horizon Research v0.5"
             echo "Created by Farbert_Took"
 
             echo ""
@@ -435,7 +543,7 @@ jobs:
             grep -R -n \
               'OPENJDK_TARGET_OS' \
               openjdk21/make/autoconf \
-              | head -n 1000
+              | head -n 1500
 
             echo ""
             echo "===== FIXED OS LISTS ====="
@@ -443,14 +551,15 @@ jobs:
             grep -R -n -E \
               'linux.*macosx|linux.*windows|linux.*aix|linux.*bsd|SUPPORTED_OS|VALID_OS' \
               openjdk21/make/autoconf \
-              | head -n 1000
+              | head -n 1500
 
           } > horizon-research/next-horizon-barriers.txt
 
           exit 0
 
+
       # ============================================================
-      # HotSpot OS directories
+      # 16. HotSpot ports existentes
       # ============================================================
 
       - name: Record HotSpot ports
@@ -484,8 +593,11 @@ jobs:
 
           } > horizon-research/hotspot-ports.txt
 
+          cat horizon-research/hotspot-ports.txt
+
+
       # ============================================================
-      # Coleta config.log
+      # 17. Coleta config logs
       # ============================================================
 
       - name: Collect configuration logs
@@ -520,11 +632,12 @@ jobs:
 
           exit 0
 
+
       # ============================================================
-      # Resultado
+      # 18. Resultado final
       # ============================================================
 
-      - name: Final v0.4 report
+      - name: Final v0.5 report
         shell: bash
         run: |
           set -e
@@ -532,7 +645,7 @@ jobs:
           echo ""
           echo "========================================"
           echo " Minecraft-NX"
-          echo " OpenJDK Horizon Research v0.4"
+          echo " OpenJDK Horizon Research v0.5"
           echo " Created by Farbert_Took"
           echo "========================================"
 
@@ -551,12 +664,13 @@ jobs:
           echo "Esta ainda e uma build de pesquisa."
           echo "Nao gera Minecraft-NX.nro nesta etapa."
 
+
       # ============================================================
-      # Artifact
+      # 19. Artifact
       # ============================================================
 
-      - name: Upload Horizon Research v0.4
+      - name: Upload Horizon Research v0.5
         uses: actions/upload-artifact@v4
         with:
-          name: Minecraft-NX-Farbert_Took-OpenJDK-Horizon-v0.4
+          name: Minecraft-NX-Farbert_Took-OpenJDK-Horizon-v0.5
           path: horizon-research
