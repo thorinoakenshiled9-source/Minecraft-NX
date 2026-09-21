@@ -1,32 +1,23 @@
-name: Build Minecraft-NX + JavaVM
+name: Build Minecraft-NX JavaVM
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - main
-      - master
+  workflow_dispatch:
 
 jobs:
-
-  build-minecraft-nx:
+  minecraft:
     runs-on: ubuntu-latest
-
     container:
       image: devkitpro/devkita64:latest
 
     steps:
-
-      - name: Checkout Minecraft-NX
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Build Minecraft-NX
         run: make -j2
-
-      - name: Verify Minecraft-NX
-        run: |
-          test -f Minecraft-NX.nro
-          ls -lh Minecraft-NX.nro
 
       - name: Upload Minecraft-NX
         uses: actions/upload-artifact@v4
@@ -34,38 +25,45 @@ jobs:
           name: Minecraft-NX-nro
           path: Minecraft-NX.nro
 
-
-  build-javm:
+  javm:
     runs-on: ubuntu-latest
-
     container:
       image: devkitpro/devkita64:latest
 
     steps:
-
       - name: Install git
         run: |
           apt-get update
           apt-get install -y git
 
-      - name: Clone javm-nx-poc
+      - name: Clone JavaVM
         run: |
           git clone --recursive https://github.com/XorTroll/javm-nx-poc.git
 
-      - name: Patch libjavm algorithm
+      - name: Patch algorithm
         run: |
-          sed -i '1i #include <algorithm>' \
-            javm-nx-poc/libjavm/libjavm/include/javm/core/core_ClassObject.hpp
+          sed -i '1i #include <algorithm>' javm-nx-poc/libjavm/libjavm/include/javm/core/core_ClassObject.hpp
+          sed -i '1i #include <algorithm>' javm-nx-poc/libjavm/libjavm/include/javm/core/core_ManifestFile.hpp
 
-          sed -i '1i #include <algorithm>' \
-            javm-nx-poc/libjavm/libjavm/include/javm/core/core_ManifestFile.hpp
-
-      - name: Disable obsolete HID
+      - name: Disable old HID
         run: |
-          sed -i '/#include.*nx\/hid\/Input.class.hpp/d' \
-            javm-nx-poc/nx/native/nx_Java.hpp
+          sed -i '/Input.class.hpp/d' javm-nx-poc/nx/native/nx_Java.hpp
 
-          sed -i '/NX_ADD_CLASS.*hid.*Input/d' \
-            javm-nx-poc/nx/native/nx_Java.hpp
+      - name: Build JavaVM
+        working-directory: javm-nx-poc/javm
+        run: make -j2
 
-      - name: Show patched nx_Java
+      - name: Find NRO
+        run: |
+          find javm-nx-poc -type f -name "*.nro" -print
+
+      - name: Copy JavaVM
+        run: |
+          mkdir -p output
+          find javm-nx-poc -type f -name "*.nro" -exec cp {} output/ \;
+
+      - name: Upload JavaVM
+        uses: actions/upload-artifact@v4
+        with:
+          name: Minecraft-NX-JavaVM
+          path: output
