@@ -1,4 +1,4 @@
-name: Minecraft-NX Java Test v4
+name: Minecraft-NX Java Test v5
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  test-v4:
+  test-v5:
     runs-on: ubuntu-latest
 
     container:
@@ -39,8 +39,8 @@ jobs:
           echo "Clone OK"
 
       # ============================================================
-      # 3. Compatibilidade C++ atual
-      # MESMO PATCH DO RECOVERY v2
+      # 3. Compatibilidade C++
+      # Mesmo patch do baseline funcional
       # ============================================================
 
       - name: Patch algorithm compatibility
@@ -52,7 +52,7 @@ jobs:
 
       # ============================================================
       # 4. HID moderno
-      # MESMO PATCH DO RECOVERY v2
+      # Mesmo patch funcional
       # ============================================================
 
       - name: Patch HID for modern libnx
@@ -119,7 +119,6 @@ jobs:
                               (void)controller;
 
                               EnsureInitialized();
-
                               padUpdate(&pad);
 
                               u64 keys =
@@ -146,7 +145,6 @@ jobs:
                               (void)controller;
 
                               EnsureInitialized();
-
                               padUpdate(&pad);
 
                               u64 keys =
@@ -173,7 +171,6 @@ jobs:
                               (void)controller;
 
                               EnsureInitialized();
-
                               padUpdate(&pad);
 
                               u64 keys =
@@ -192,7 +189,7 @@ jobs:
           """; p.write_text(s)'
 
       # ============================================================
-      # 5. Confirma HID
+      # 5. Verifica HID
       # ============================================================
 
       - name: Verify native Input
@@ -211,15 +208,15 @@ jobs:
           echo "HID OK"
 
       # ============================================================
-      # 6. TESTE v4
+      # 6. TESTE v5
       #
-      # Esta deve ser a UNICA alteração no programa Java.
+      # Continua existindo apenas UM println.
       #
-      # Antes:
+      # Original:
       # Hello World, from Java!
       #
-      # Depois:
-      # Minecraft-NX
+      # Novo:
+      # Minecraft-NX - Created by Farbert_Took
       # ============================================================
 
       - name: Change ONLY Hello World string
@@ -242,24 +239,21 @@ jobs:
           echo "===== ORIGINAL ====="
           cat "$MAIN_JAVA"
 
-          python3 -c 'from pathlib import Path; p=Path("'"$MAIN_JAVA"'"); s=p.read_text(); old="Hello World, from Java!"; assert old in s, "String original nao encontrada"; s=s.replace(old, "Minecraft-NX", 1); p.write_text(s)'
+          python3 -c 'from pathlib import Path; p=Path("'"$MAIN_JAVA"'"); s=p.read_text(); old="Hello World, from Java!"; assert old in s, "String original nao encontrada"; s=s.replace(old, "Minecraft-NX - Created by Farbert_Took", 1); p.write_text(s)'
 
           echo ""
           echo "===== MODIFICADO ====="
           cat "$MAIN_JAVA"
 
-          echo ""
-          echo "Verificando..."
-
           grep -q \
-            'Minecraft-NX' \
+            'Minecraft-NX - Created by Farbert_Took' \
             "$MAIN_JAVA"
 
-          echo "Alteracao unica confirmada."
+          echo ""
+          echo "Teste v5 preparado."
 
       # ============================================================
       # 7. Biblioteca Java NX
-      # MESMO RECOVERY v2
       # ============================================================
 
       - name: Build NX Java library
@@ -268,8 +262,7 @@ jobs:
           mvn package
 
       # ============================================================
-      # 8. Hello World Maven
-      # MESMO PROJETO ORIGINAL
+      # 8. Compila Java
       # ============================================================
 
       - name: Build Java program
@@ -278,8 +271,8 @@ jobs:
           mvn clean package
 
       # ============================================================
-      # 9. Launcher direto
-      # MESMO PATCH DO RECOVERY v2
+      # 9. Launcher
+      # Exatamente o mesmo caminho do baseline funcional
       # ============================================================
 
       - name: Patch direct Java launch
@@ -288,7 +281,7 @@ jobs:
           python3 -c 'from pathlib import Path; p=Path("javm-nx-poc/javm/source/Main.cpp"); s=p.read_text(); marker="int main(int argc, char **argv)"; marker2="int main(int argc, char *argv[])"; marker=marker if marker in s else marker2; assert marker in s, "main nao encontrado"; start=s.index(marker); brace=s.index("{", start)+1; patch="\n    static char direct_app[] = \"javm.nro\";\n    static char direct_jar[] = \"sdmc:/switch/java-hello-world.jar\";\n    static char *direct_argv[] = { direct_app, direct_jar, nullptr };\n    argc = 2;\n    argv = direct_argv;\n"; p.write_text(s[:brace]+patch+s[brace:])'
 
       # ============================================================
-      # 10. Confere launcher
+      # 10. Verifica launcher
       # ============================================================
 
       - name: Verify direct launch
@@ -313,8 +306,7 @@ jobs:
           make -j2
 
       # ============================================================
-      # 12. Pacote SD
-      # MESMOS NOMES E CAMINHOS DO RECOVERY v2
+      # 12. Prepara SD
       # ============================================================
 
       - name: Prepare SD package
@@ -348,14 +340,6 @@ jobs:
             exit 1
           fi
 
-          echo ""
-          echo "NRO:"
-          echo "$JAVM_NRO"
-
-          echo ""
-          echo "JAR:"
-          echo "$JAVA_JAR"
-
           cp \
             "$JAVM_NRO" \
             SD/switch/javm.nro
@@ -365,11 +349,15 @@ jobs:
             SD/switch/java-hello-world.jar
 
           echo ""
-          echo "===== PACOTE ====="
+          echo "========================================"
+          echo " Minecraft-NX Test v5"
+          echo " Created by Farbert_Took"
+          echo "========================================"
+
           find SD -type f -print
 
       # ============================================================
-      # 13. Verificação final
+      # 13. Verificação
       # ============================================================
 
       - name: Verify package
@@ -377,32 +365,26 @@ jobs:
         run: |
           set -e
 
-          test -f \
-            SD/switch/javm.nro
-
-          test -f \
-            SD/switch/java-hello-world.jar
+          test -f SD/switch/javm.nro
+          test -f SD/switch/java-hello-world.jar
 
           echo ""
-          echo "javm.nro:"
+          echo "=== javm.nro ==="
           ls -lh SD/switch/javm.nro
 
           echo ""
-          echo "java-hello-world.jar:"
+          echo "=== java-hello-world.jar ==="
           ls -lh SD/switch/java-hello-world.jar
 
           echo ""
-          echo "========================================"
-          echo " Minecraft-NX v4 pronto"
-          echo " Created by Farbert_Took"
-          echo "========================================"
+          echo "Minecraft-NX v5 OK"
 
       # ============================================================
       # 14. Artifact
       # ============================================================
 
-      - name: Upload Test v4
+      - name: Upload Test v5
         uses: actions/upload-artifact@v4
         with:
-          name: Minecraft-NX-Farbert_Took-Test-v4
+          name: Minecraft-NX-Farbert_Took-Test-v5
           path: SD
