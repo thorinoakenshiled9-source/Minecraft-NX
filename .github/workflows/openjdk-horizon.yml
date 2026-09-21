@@ -1,4 +1,4 @@
-name: OpenJDK Horizon Research v1.3
+name: OpenJDK Horizon Research v1.4
 
 on:
   workflow_dispatch:
@@ -20,21 +20,24 @@ jobs:
 
       # ============================================================
       # Minecraft-NX
-      # OpenJDK Horizon Research v1.3
+      # OpenJDK Horizon Research v1.4
       # Created by Farbert_Took
       #
       # v1.2:
       #   FreeType statico para Horizon: OK
       #
-      # Bloqueio atual:
-      #   Could not find X11 libraries
-      #
       # v1.3:
-      #   - preserva FreeType
-      #   - localiza a checagem X11 real
-      #   - bypass X11 SOMENTE para Horizon
-      #   - tenta configure novamente
-      #   - se configure = 0, tenta make hotspot
+      #   primeiro bloqueio X11: ultrapassado
+      #
+      # v1.4:
+      #   trata separadamente:
+      #     - bibliotecas X11
+      #     - headers X11
+      #
+      # Somente para o target experimental Horizon.
+      #
+      # Se configure = 0:
+      #   tenta make hotspot
       #
       # Isto ainda e pesquisa de port.
       # ============================================================
@@ -78,7 +81,7 @@ jobs:
           echo ""
           echo "========================================"
           echo " Minecraft-NX"
-          echo " OpenJDK Horizon Research v1.3"
+          echo " OpenJDK Horizon Research v1.4"
           echo " Created by Farbert_Took"
           echo "========================================"
 
@@ -113,7 +116,7 @@ jobs:
 
           {
             echo "Minecraft-NX"
-            echo "OpenJDK Horizon Research v1.3"
+            echo "OpenJDK Horizon Research v1.4"
             echo "Created by Farbert_Took"
             echo ""
             echo "Target: Nintendo Switch Horizon"
@@ -121,12 +124,12 @@ jobs:
             echo "JVM: OpenJDK 21 HotSpot minimal"
             echo "Mode: headless"
             echo "FreeType: static target library"
-            echo "Current research target: X11 detection"
+            echo "Research: complete X11 configure bypass"
           } > horizon-research/info.txt
 
 
       # ============================================================
-      # 4. Toolchain
+      # 4. Verifica devkitA64
       # ============================================================
 
       - name: Verify devkitA64
@@ -143,6 +146,9 @@ jobs:
 
           aarch64-none-elf-g++ --version \
             | tee horizon-research/gxx-version.txt
+
+          echo ""
+          echo "devkitA64 + libnx OK"
 
 
       # ============================================================
@@ -177,7 +183,7 @@ jobs:
 
 
       # ============================================================
-      # 6. Boot JDK
+      # 6. Boot JDK 20
       # ============================================================
 
       - name: Download Boot JDK 20
@@ -227,7 +233,7 @@ jobs:
 
 
       # ============================================================
-      # 8. Configure FreeType
+      # 8. Configure FreeType para Horizon
       # ============================================================
 
       - name: Configure FreeType for Horizon
@@ -277,9 +283,12 @@ jobs:
         run: |
           set +e
 
-          CONFIG_STATUS=$(cat horizon-research/freetype-configure-exit.txt)
+          CONFIG_STATUS=$(
+            cat horizon-research/freetype-configure-exit.txt
+          )
 
           if [ "$CONFIG_STATUS" != "0" ]; then
+
             echo "FreeType configure failed." \
               | tee horizon-research/freetype-build.log
 
@@ -301,16 +310,18 @@ jobs:
             > ../horizon-research/freetype-build-exit.txt
 
           if [ "$STATUS" = "0" ]; then
+
             ninja install \
               2>&1 \
               | tee ../horizon-research/freetype-install.log
+
           fi
 
           exit 0
 
 
       # ============================================================
-      # 10. Valida FreeType
+      # 10. Valida libfreetype.a
       # ============================================================
 
       - name: Validate Horizon FreeType
@@ -326,12 +337,17 @@ jobs:
           )
 
           if [ -z "$FREETYPE_LIB" ]; then
+
             echo "FREETYPE_READY=no" >> "$GITHUB_ENV"
+
             echo "libfreetype.a NOT FOUND"
+
             exit 0
           fi
 
-          FREETYPE_LIBDIR=$(dirname "$FREETYPE_LIB")
+          FREETYPE_LIBDIR=$(
+            dirname "$FREETYPE_LIB"
+          )
 
           echo "FREETYPE_READY=yes" >> "$GITHUB_ENV"
           echo "FREETYPE_LIB=$FREETYPE_LIB" >> "$GITHUB_ENV"
@@ -344,7 +360,12 @@ jobs:
           echo ""
 
           echo "$FREETYPE_LIB"
+
           ls -lh "$FREETYPE_LIB"
+
+          echo ""
+          echo "Archive members:"
+          echo ""
 
           aarch64-none-elf-ar \
             t "$FREETYPE_LIB" \
@@ -355,7 +376,50 @@ jobs:
 
 
       # ============================================================
-      # 11. OpenJDK
+      # 11. Teste dos headers FreeType
+      # ============================================================
+
+      - name: Verify FreeType headers with target compiler
+        shell: bash
+        run: |
+          set +e
+
+          if [ "$FREETYPE_READY" != "yes" ]; then
+            exit 0
+          fi
+
+          cat > horizon-research/freetype-test.c <<'EOF'
+          #include <ft2build.h>
+          #include FT_FREETYPE_H
+
+          int minecraft_nx_freetype(void)
+          {
+              FT_Library library = 0;
+              return library == 0 ? 21 : 0;
+          }
+          EOF
+
+          aarch64-none-elf-gcc \
+            -march=armv8-a \
+            -D__SWITCH__ \
+            -I/opt/devkitpro/libnx/include \
+            -I"$FREETYPE_PREFIX/include/freetype2" \
+            -c \
+            horizon-research/freetype-test.c \
+            -o horizon-research/freetype-test.o \
+            2>&1 \
+            | tee horizon-research/freetype-test.log
+
+          STATUS=${PIPESTATUS[0]}
+
+          echo "$STATUS" \
+            > horizon-research/freetype-test-exit.txt
+
+          exit 0
+
+
+      # ============================================================
+      # 12. OpenJDK 21
       # ============================================================
 
       - name: Clone OpenJDK 21
@@ -375,7 +439,7 @@ jobs:
 
 
       # ============================================================
-      # 12. Horizon mapping
+      # 13. Horizon OS mapping
       # ============================================================
 
       - name: Add Horizon OS mapping
@@ -386,13 +450,20 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          p = Path("openjdk21/make/autoconf/platform.m4")
+          p = Path(
+              "openjdk21/make/autoconf/platform.m4"
+          )
+
           s = p.read_text()
 
-          needle = 'AC_MSG_ERROR([unsupported operating system $1])'
+          needle = (
+              'AC_MSG_ERROR([unsupported operating system $1])'
+          )
 
           if needle not in s:
-              raise SystemExit("OS fallback not found")
+              raise SystemExit(
+                  "OS fallback not found"
+              )
 
           insertion = '''elf)
                 VAR_OS=horizon
@@ -404,17 +475,26 @@ jobs:
                 ;;'''
 
           if fallback in s:
+
               s = s.replace(
                   fallback,
                   insertion + fallback,
                   1
               )
+
           else:
+
               pos = s.find(needle)
-              case_start = s.rfind("*)", 0, pos)
+              case_start = s.rfind(
+                  "*)",
+                  0,
+                  pos
+              )
 
               if case_start < 0:
-                  raise SystemExit("OS fallback case not found")
+                  raise SystemExit(
+                      "OS fallback case not found"
+                  )
 
               s = (
                   s[:case_start]
@@ -424,12 +504,14 @@ jobs:
 
           p.write_text(s)
 
-          print("elf -> horizon mapping installed")
+          print(
+              "elf -> horizon mapping installed"
+          )
           PY
 
 
       # ============================================================
-      # 13. CUPS bypass
+      # 14. CUPS bypass para Horizon
       # ============================================================
 
       - name: Apply Horizon CUPS research bypass
@@ -440,24 +522,43 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          root = Path("openjdk21/make/autoconf")
+          root = Path(
+              "openjdk21/make/autoconf"
+          )
+
           target = None
 
           for p in root.rglob("*.m4"):
-              text = p.read_text(errors="ignore")
+
+              text = p.read_text(
+                  errors="ignore"
+              )
 
               if "Could not find cups" in text:
                   target = p
                   break
 
           if target is None:
-              raise SystemExit("CUPS check not found")
+              raise SystemExit(
+                  "CUPS check not found"
+              )
 
           text = target.read_text()
-          pos = text.find("Could not find cups")
 
-          start = text.rfind("\n", 0, pos) + 1
-          end = text.find("\n", pos)
+          pos = text.find(
+              "Could not find cups"
+          )
+
+          start = text.rfind(
+              "\n",
+              0,
+              pos
+          ) + 1
+
+          end = text.find(
+              "\n",
+              pos
+          )
 
           if end < 0:
               end = len(text)
@@ -465,7 +566,8 @@ jobs:
           original = text[start:end]
 
           indent = original[
-              :len(original) - len(original.lstrip())
+              :len(original)
+              - len(original.lstrip())
           ]
 
           replacement = (
@@ -485,13 +587,22 @@ jobs:
               + 'fi'
           )
 
-          text = text[:start] + replacement + text[end:]
+          text = (
+              text[:start]
+              + replacement
+              + text[end:]
+          )
+
           target.write_text(text)
+
+          print(
+              "Horizon CUPS bypass installed"
+          )
           PY
 
 
       # ============================================================
-      # 14. Fontconfig bypass
+      # 15. Fontconfig bypass para Horizon
       # ============================================================
 
       - name: Apply Horizon Fontconfig research bypass
@@ -502,24 +613,43 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          root = Path("openjdk21/make/autoconf")
+          root = Path(
+              "openjdk21/make/autoconf"
+          )
+
           target = None
 
           for p in root.rglob("*.m4"):
-              text = p.read_text(errors="ignore")
+
+              text = p.read_text(
+                  errors="ignore"
+              )
 
               if "Could not find fontconfig" in text:
                   target = p
                   break
 
           if target is None:
-              raise SystemExit("Fontconfig check not found")
+              raise SystemExit(
+                  "Fontconfig check not found"
+              )
 
           text = target.read_text()
-          pos = text.find("Could not find fontconfig")
 
-          start = text.rfind("\n", 0, pos) + 1
-          end = text.find("\n", pos)
+          pos = text.find(
+              "Could not find fontconfig"
+          )
+
+          start = text.rfind(
+              "\n",
+              0,
+              pos
+          ) + 1
+
+          end = text.find(
+              "\n",
+              pos
+          )
 
           if end < 0:
               end = len(text)
@@ -527,7 +657,8 @@ jobs:
           original = text[start:end]
 
           indent = original[
-              :len(original) - len(original.lstrip())
+              :len(original)
+              - len(original.lstrip())
           ]
 
           replacement = (
@@ -547,13 +678,24 @@ jobs:
               + 'fi'
           )
 
-          text = text[:start] + replacement + text[end:]
+          text = (
+              text[:start]
+              + replacement
+              + text[end:]
+          )
+
           target.write_text(text)
+
+          print(
+              "Horizon Fontconfig bypass installed"
+          )
           PY
 
 
       # ============================================================
-      # 15. FreeType statico - patch v1.2 preservado
+      # 16. FreeType statico para Horizon
+      #
+      # Patch confirmado funcional no v1.2 e v1.3.
       # ============================================================
 
       - name: Add static FreeType detection for Horizon
@@ -579,105 +721,183 @@ jobs:
               FREETYPE_LIB_NAME="${LIBRARY_PREFIX}${FREETYPE_BASE_NAME}${SHARED_LIBRARY_SUFFIX}"
             fi'''
 
-          if s.count(old) != 1:
+          count = s.count(old)
+
+          print(
+              "Original FreeType expression count:",
+              count
+          )
+
+          if count != 1:
               raise SystemExit(
                   "Expected exactly one FreeType library expression"
               )
 
-          s = s.replace(old, new, 1)
+          s = s.replace(
+              old,
+              new,
+              1
+          )
+
           p.write_text(s)
 
-          print("Horizon static FreeType patch installed")
+          print(
+              "Horizon static FreeType patch installed"
+          )
           PY
+
+          echo ""
+          echo "========================================"
+          echo " FREETYPE PATCH RESULT"
+          echo "========================================"
+          echo ""
 
           grep \
             -n \
-            -C 10 \
+            -C 12 \
             'Horizon target: using static FreeType' \
             openjdk21/make/autoconf/lib-freetype.m4 \
-            | tee horizon-research/freetype-static-patch.txt
+            | tee horizon-research/freetype-static-patch-v1.4.txt
 
 
       # ============================================================
-      # 16. LOCALIZA X11
+      # 17. Localiza TODO o bloco X11
       #
-      # Esta etapa registra a estrutura real antes de modificar.
+      # v1.3 encontrou:
+      #
+      # 1. Could not find X11 libraries
+      # 2. Could not find all X11 headers
+      #
+      # Registramos ambos antes do patch.
       # ============================================================
 
-      - name: Locate OpenJDK X11 check
+      - name: Locate complete OpenJDK X11 checks
         shell: bash
         run: |
           set -e
 
-          echo "Searching OpenJDK X11 checks..."
+          echo ""
+          echo "========================================"
+          echo " OPENJDK X11 RESEARCH v1.4"
+          echo " Created by Farbert_Took"
+          echo "========================================"
+          echo ""
 
           grep \
             -Rni \
             -E \
-            'Could not find X11 libraries|X11 libraries|X11_CFLAGS|X11_LIBS|Xext|Xrender|Xrandr|Xtst' \
+            'Could not find X11 libraries|Could not find all X11 headers|X11/extensions/shape.h|Xrender.h|Xrandr.h|XTest.h|Intrinsic.h|X11_CFLAGS|X11_LIBS|X_CFLAGS|X_LIBS' \
             openjdk21/make/autoconf \
-            | tee horizon-research/x11-check-locations.txt \
+            | tee horizon-research/x11-check-locations-v1.4.txt \
             || true
 
           python3 - <<'PY'
           from pathlib import Path
 
-          root = Path("openjdk21/make/autoconf")
-          needle = "Could not find X11 libraries"
-
-          found = []
-
-          for p in root.rglob("*.m4"):
-              text = p.read_text(errors="ignore")
-
-              if needle in text:
-                  lines = text.splitlines()
-
-                  for i, line in enumerate(lines):
-                      if needle in line:
-                          found.append((p, i, lines))
-
-          if not found:
-              raise SystemExit(
-                  "Fatal X11 check not found in autoconf sources"
-              )
-
-          out = Path(
-              "horizon-research/x11-check-context.txt"
+          root = Path(
+              "openjdk21/make/autoconf"
           )
 
-          with out.open("w") as f:
-              for p, i, lines in found:
-                  f.write("=" * 70 + "\n")
-                  f.write(f"FILE: {p}\n")
-                  f.write(f"LINE: {i + 1}\n")
-                  f.write("=" * 70 + "\n")
+          needles = [
+              "Could not find X11 libraries",
+              "Could not find all X11 headers",
+          ]
 
-                  start = max(0, i - 50)
-                  end = min(len(lines), i + 51)
+          output = Path(
+              "horizon-research/x11-complete-context-v1.4.txt"
+          )
 
-                  for n in range(start, end):
-                      f.write(
-                          f"{n + 1:5}: {lines[n]}\n"
-                      )
+          found_total = 0
 
-                  f.write("\n")
+          with output.open("w") as out:
 
-          print(out.read_text())
+              for p in root.rglob("*.m4"):
+
+                  text = p.read_text(
+                      errors="ignore"
+                  )
+
+                  lines = text.splitlines()
+
+                  for needle in needles:
+
+                      for i, line in enumerate(lines):
+
+                          if needle not in line:
+                              continue
+
+                          found_total += 1
+
+                          out.write(
+                              "=" * 78 + "\n"
+                          )
+
+                          out.write(
+                              f"FILE: {p}\n"
+                          )
+
+                          out.write(
+                              f"NEEDLE: {needle}\n"
+                          )
+
+                          out.write(
+                              f"LINE: {i + 1}\n"
+                          )
+
+                          out.write(
+                              "=" * 78 + "\n"
+                          )
+
+                          start = max(
+                              0,
+                              i - 80
+                          )
+
+                          end = min(
+                              len(lines),
+                              i + 81
+                          )
+
+                          for n in range(
+                              start,
+                              end
+                          ):
+
+                              out.write(
+                                  f"{n + 1:5}: "
+                                  f"{lines[n]}\n"
+                              )
+
+                          out.write("\n")
+
+          print(
+              output.read_text()
+          )
+
+          if found_total < 2:
+              raise SystemExit(
+                  "Expected both X11 library and header checks"
+              )
+
+          print(
+              "X11 checks found:",
+              found_total
+          )
           PY
 
 
       # ============================================================
-      # 17. X11 BYPASS PARA HORIZON
+      # 18. X11 COMPLETO PARA HORIZON
       #
-      # Em vez de instalar X11 Linux do host, tornamos o erro fatal
-      # nao-fatal somente para o target Horizon.
+      # Nao implementa X11.
       #
-      # O objetivo aqui e continuar a sondagem do configure.
-      # Isto NAO implementa AWT/X11 no Switch.
+      # Apenas impede que a configuracao de um target Horizon
+      # headless seja encerrada pelas verificacoes de X11.
+      #
+      # Outros targets mantem o comportamento original.
       # ============================================================
 
-      - name: Apply Horizon X11 research bypass
+      - name: Apply complete Horizon headless X11 bypass
         shell: bash
         run: |
           set -e
@@ -685,99 +905,185 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          root = Path("openjdk21/make/autoconf")
-          needle = "Could not find X11 libraries"
+          root = Path(
+              "openjdk21/make/autoconf"
+          )
 
-          matches = []
-
-          for p in root.rglob("*.m4"):
-              text = p.read_text(errors="ignore")
-
-              if needle in text:
-                  matches.append(p)
-
-          if len(matches) != 1:
-              raise SystemExit(
-                  f"Expected one X11 fatal check file, found {len(matches)}: {matches}"
-              )
-
-          p = matches[0]
-          text = p.read_text()
-
-          lines = text.splitlines(True)
-
-          target_index = None
-
-          for i, line in enumerate(lines):
-              if (
-                  needle in line
-                  and "AC_MSG_ERROR" in line
-              ):
-                  target_index = i
-                  break
-
-          if target_index is None:
-              raise SystemExit(
-                  "X11 message found, but expected AC_MSG_ERROR line was not found"
-              )
-
-          original = lines[target_index]
-
-          indent = original[
-              :len(original) - len(original.lstrip())
+          checks = [
+              (
+                  "Could not find X11 libraries",
+                  "X11 libraries"
+              ),
+              (
+                  "Could not find all X11 headers",
+                  "X11 headers"
+              ),
           ]
 
-          newline = (
-              "\n" if original.endswith("\n") else ""
-          )
+          patched = []
 
-          original_body = original.rstrip("\n")
+          for needle, label in checks:
 
-          replacement = (
-              indent
-              + 'if test "x$OPENJDK_TARGET_OS" = "xhorizon"; then\n'
-              + indent
-              + '  AC_MSG_WARN([X11 disabled for experimental Horizon headless target])\n'
-              + indent
-              + '  X_CFLAGS=""\n'
-              + indent
-              + '  X_LIBS=""\n'
-              + indent
-              + 'else\n'
-              + original_body
-              + '\n'
-              + indent
-              + 'fi'
-              + newline
-          )
+              candidates = []
 
-          lines[target_index] = replacement
+              for p in root.rglob("*.m4"):
 
-          p.write_text("".join(lines))
+                  text = p.read_text(
+                      errors="ignore"
+                  )
 
-          print(f"Patched: {p}")
+                  if needle in text:
+                      candidates.append(p)
+
+              if len(candidates) != 1:
+
+                  raise SystemExit(
+                      f"{label}: expected exactly "
+                      f"one source file, found "
+                      f"{len(candidates)}: "
+                      f"{candidates}"
+                  )
+
+              p = candidates[0]
+
+              text = p.read_text()
+
+              lines = text.splitlines(
+                  True
+              )
+
+              indexes = []
+
+              for i, line in enumerate(lines):
+
+                  if (
+                      needle in line
+                      and "AC_MSG_ERROR" in line
+                  ):
+
+                      indexes.append(i)
+
+              if len(indexes) != 1:
+
+                  raise SystemExit(
+                      f"{label}: expected exactly "
+                      f"one AC_MSG_ERROR line, "
+                      f"found {len(indexes)}"
+                  )
+
+              i = indexes[0]
+
+              original = lines[i]
+
+              indent = original[
+                  :len(original)
+                  - len(original.lstrip())
+              ]
+
+              original_body = (
+                  original.rstrip("\n")
+              )
+
+              if label == "X11 libraries":
+
+                  warning = (
+                      "X11 libraries disabled for "
+                      "experimental Horizon "
+                      "headless target"
+                  )
+
+              else:
+
+                  warning = (
+                      "X11 headers disabled for "
+                      "experimental Horizon "
+                      "headless target"
+                  )
+
+              replacement = (
+                  indent
+                  + 'if test "x$OPENJDK_TARGET_OS" = "xhorizon"; then\n'
+                  + indent
+                  + '  AC_MSG_WARN(['
+                  + warning
+                  + '])\n'
+                  + indent
+                  + '  X_CFLAGS=""\n'
+                  + indent
+                  + '  X_LIBS=""\n'
+                  + indent
+                  + 'else\n'
+                  + original_body
+                  + '\n'
+                  + indent
+                  + 'fi\n'
+              )
+
+              lines[i] = replacement
+
+              p.write_text(
+                  "".join(lines)
+              )
+
+              patched.append(
+                  (
+                      str(p),
+                      label
+                  )
+              )
+
           print("")
           print(
-              "X11 fatal error is now bypassed only for OPENJDK_TARGET_OS=horizon"
+              "Horizon X11 patches:"
+          )
+
+          for p, label in patched:
+
+              print(
+                  f"  {label}: {p}"
+              )
+
+          print("")
+          print(
+              "Original checks remain active "
+              "for non-Horizon targets."
           )
           PY
 
           echo ""
           echo "========================================"
-          echo " X11 PATCH RESULT"
+          echo " X11 COMPLETE PATCH v1.4"
           echo "========================================"
           echo ""
 
           grep \
             -Rni \
-            -C 15 \
-            'X11 disabled for experimental Horizon' \
+            -C 12 \
+            -E \
+            'X11 libraries disabled for experimental Horizon|X11 headers disabled for experimental Horizon' \
             openjdk21/make/autoconf \
-            | tee horizon-research/x11-horizon-patch.txt
+            | tee horizon-research/x11-complete-patch-v1.4.txt
+
+          echo ""
+          echo "========================================"
+          echo " VALIDATING X11 PATCH"
+          echo "========================================"
+          echo ""
+
+          grep -Rqs \
+            'X11 libraries disabled for experimental Horizon' \
+            openjdk21/make/autoconf
+
+          grep -Rqs \
+            'X11 headers disabled for experimental Horizon' \
+            openjdk21/make/autoconf
+
+          echo "X11 library guard: OK"
+          echo "X11 header guard: OK"
 
 
       # ============================================================
-      # 18. Valida patches
+      # 19. Valida todos os patches
       # ============================================================
 
       - name: Validate Horizon patches
@@ -790,7 +1096,11 @@ jobs:
             openjdk21/make/autoconf
 
           grep -Rqs \
-            'X11 disabled for experimental Horizon' \
+            'X11 libraries disabled for experimental Horizon' \
+            openjdk21/make/autoconf
+
+          grep -Rqs \
+            'X11 headers disabled for experimental Horizon' \
             openjdk21/make/autoconf
 
           grep -Rqs \
@@ -801,14 +1111,21 @@ jobs:
             'Fontconfig disabled for experimental Horizon' \
             openjdk21/make/autoconf
 
+          echo ""
+          echo "========================================"
+          echo " HORIZON PATCH VALIDATION"
+          echo "========================================"
+          echo ""
+
           echo "FreeType Horizon patch: OK"
-          echo "X11 Horizon patch: OK"
+          echo "X11 libraries Horizon patch: OK"
+          echo "X11 headers Horizon patch: OK"
           echo "CUPS Horizon patch: OK"
           echo "Fontconfig Horizon patch: OK"
 
 
       # ============================================================
-      # 19. Salva diff
+      # 20. Salva diff
       # ============================================================
 
       - name: Save OpenJDK Horizon patch
@@ -817,11 +1134,14 @@ jobs:
           set -e
 
           git -C openjdk21 diff \
-            > horizon-research/openjdk-horizon-v1.3.patch
+            > horizon-research/openjdk-horizon-v1.4.patch
 
           echo ""
-          echo "Patch size:"
-          wc -l horizon-research/openjdk-horizon-v1.3.patch
+          echo "Patch lines:"
+          echo ""
+
+          wc -l \
+            horizon-research/openjdk-horizon-v1.4.patch
 
           echo ""
           echo "Relevant patch:"
@@ -829,16 +1149,16 @@ jobs:
 
           grep \
             -n \
-            -C 12 \
+            -C 15 \
             -E \
             'horizon|Horizon|FREETYPE_LIB_NAME|X11|CUPS|Fontconfig' \
-            horizon-research/openjdk-horizon-v1.3.patch \
-            | head -n 1000 \
+            horizon-research/openjdk-horizon-v1.4.patch \
+            | head -n 1500 \
             || true
 
 
       # ============================================================
-      # 20. Configure OpenJDK
+      # 21. Configure OpenJDK
       # ============================================================
 
       - name: Configure OpenJDK Horizon
@@ -847,8 +1167,9 @@ jobs:
           set +e
 
           if [ "$FREETYPE_READY" != "yes" ]; then
+
             echo "FreeType target unavailable." \
-              > horizon-research/configure-v1.3.log
+              > horizon-research/configure-v1.4.log
 
             echo "99" \
               > horizon-research/configure-exit-code.txt
@@ -860,8 +1181,17 @@ jobs:
 
           echo ""
           echo "========================================"
-          echo " OPENJDK HORIZON CONFIGURE v1.3"
+          echo " OPENJDK HORIZON CONFIGURE v1.4"
           echo "========================================"
+          echo ""
+
+          echo "FreeType include:"
+          echo "$FREETYPE_PREFIX/include/freetype2"
+
+          echo ""
+          echo "FreeType lib:"
+          echo "$FREETYPE_LIBDIR"
+
           echo ""
 
           bash configure \
@@ -881,7 +1211,7 @@ jobs:
             OBJCOPY=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-objcopy \
             STRIP=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-strip \
             2>&1 \
-            | tee ../horizon-research/configure-v1.3.log
+            | tee ../horizon-research/configure-v1.4.log
 
           STATUS=${PIPESTATUS[0]}
 
@@ -892,7 +1222,7 @@ jobs:
 
 
       # ============================================================
-      # 21. Summary
+      # 22. SUMMARY
       # ============================================================
 
       - name: Analyze OpenJDK configure
@@ -903,7 +1233,7 @@ jobs:
           {
             echo "========================================"
             echo " Minecraft-NX"
-            echo " OpenJDK Horizon Research v1.3"
+            echo " OpenJDK Horizon Research v1.4"
             echo " Created by Farbert_Took"
             echo "========================================"
 
@@ -944,24 +1274,24 @@ jobs:
             echo ""
 
             grep -i -E \
-              'error|warning|unsupported|horizon|target|host|aarch64|headless|minimal|freetype|cups|fontconfig|x11|xext|xrender|xrandr|xtst|alsa|ffi|sysroot|posix|linux|library|libraries|header|headers|jvm|pthread|signal|mmap|munmap|dlopen|dlsym|socket|atomic|thread' \
-              horizon-research/configure-v1.3.log \
-              | tail -n 3000 \
+              'error|warning|unsupported|horizon|target|host|aarch64|headless|minimal|freetype|cups|fontconfig|x11|xext|xrender|xrandr|xtst|intrinsic|alsa|ffi|sysroot|posix|linux|library|libraries|header|headers|jvm|pthread|signal|mmap|munmap|dlopen|dlsym|socket|atomic|thread' \
+              horizon-research/configure-v1.4.log \
+              | tail -n 4000 \
               || true
 
-          } > horizon-research/summary-v1.3.txt
+          } > horizon-research/summary-v1.4.txt
 
           echo ""
           echo "========================================"
-          echo " SUMMARY v1.3"
+          echo " SUMMARY v1.4"
           echo "========================================"
           echo ""
 
-          cat horizon-research/summary-v1.3.txt
+          cat horizon-research/summary-v1.4.txt
 
 
       # ============================================================
-      # 22. Configure tail
+      # 23. Configure tail
       # ============================================================
 
       - name: Show configure tail
@@ -971,20 +1301,22 @@ jobs:
 
           echo ""
           echo "========================================"
-          echo " CONFIGURE LAST 800"
+          echo " CONFIGURE LAST 1000"
           echo "========================================"
           echo ""
 
           tail \
-            -n 800 \
-            horizon-research/configure-v1.3.log \
-            | tee horizon-research/configure-tail-v1.3.txt
+            -n 1000 \
+            horizon-research/configure-v1.4.log \
+            | tee horizon-research/configure-tail-v1.4.txt
 
           exit 0
 
 
       # ============================================================
-      # 23. HotSpot probe
+      # 24. HotSpot probe
+      #
+      # Somente se configure = 0.
       # ============================================================
 
       - name: Probe HotSpot build
@@ -997,25 +1329,27 @@ jobs:
           )
 
           if [ "$CONFIG_STATUS" != "0" ]; then
+
             {
               echo "========================================"
-              echo " HOTSPOT PROBE v1.3"
+              echo " HOTSPOT PROBE v1.4"
               echo "========================================"
               echo ""
               echo "NOT STARTED"
               echo ""
               echo "OpenJDK configure exit:"
               echo "$CONFIG_STATUS"
-            } > horizon-research/hotspot-summary-v1.3.txt
 
-            cat horizon-research/hotspot-summary-v1.3.txt
+            } > horizon-research/hotspot-summary-v1.4.txt
+
+            cat horizon-research/hotspot-summary-v1.4.txt
 
             exit 0
           fi
 
           echo ""
           echo "========================================"
-          echo " CONFIGURE = 0"
+          echo " OPENJDK CONFIGURE = 0"
           echo " STARTING HOTSPOT PROBE"
           echo "========================================"
           echo ""
@@ -1024,7 +1358,7 @@ jobs:
 
           make hotspot \
             2>&1 \
-            | tee ../horizon-research/hotspot-build-v1.3.log
+            | tee ../horizon-research/hotspot-build-v1.4.log
 
           STATUS=${PIPESTATUS[0]}
 
@@ -1034,7 +1368,7 @@ jobs:
           {
             echo "========================================"
             echo " Minecraft-NX"
-            echo " HOTSPOT PROBE v1.3"
+            echo " HOTSPOT PROBE v1.4"
             echo " Created by Farbert_Took"
             echo "========================================"
 
@@ -1048,27 +1382,27 @@ jobs:
 
             grep -i -E \
               'error|fatal|horizon|aarch64|os_cpu|os/|not found|no rule|undefined|unsupported|missing|posix|linux|pthread|signal|mmap|munmap|dlopen|dlsym|clock|gettimeofday|thread|socket|atomic|errno' \
-              ../horizon-research/hotspot-build-v1.3.log \
-              | tail -n 4000 \
+              ../horizon-research/hotspot-build-v1.4.log \
+              | tail -n 5000 \
               || true
 
             echo ""
-            echo "===== LAST 1000 ====="
+            echo "===== LAST 1200 ====="
             echo ""
 
             tail \
-              -n 1000 \
-              ../horizon-research/hotspot-build-v1.3.log
+              -n 1200 \
+              ../horizon-research/hotspot-build-v1.4.log
 
-          } > ../horizon-research/hotspot-summary-v1.3.txt
+          } > ../horizon-research/hotspot-summary-v1.4.txt
 
-          cat ../horizon-research/hotspot-summary-v1.3.txt
+          cat ../horizon-research/hotspot-summary-v1.4.txt
 
           exit 0
 
 
       # ============================================================
-      # 24. Mapa do port HotSpot
+      # 25. HotSpot source map
       # ============================================================
 
       - name: Create HotSpot port map
@@ -1078,7 +1412,7 @@ jobs:
 
           {
             echo "Minecraft-NX"
-            echo "HotSpot Horizon Port Map v1.3"
+            echo "HotSpot Horizon Port Map v1.4"
             echo "Created by Farbert_Took"
 
             echo ""
@@ -1129,18 +1463,62 @@ jobs:
               | sort
 
             echo ""
-            echo "===== Potential Horizon port ====="
+            echo "===== Potential Horizon structure ====="
 
             echo "src/hotspot/os/horizon/"
             echo "src/hotspot/os_cpu/horizon_aarch64/"
 
-          } > horizon-research/hotspot-port-map-v1.3.txt
+          } > horizon-research/hotspot-port-map-v1.4.txt
 
           exit 0
 
 
       # ============================================================
-      # 25. Config logs
+      # 26. Pesquisa dlopen
+      #
+      # Nao faz bypass.
+      # Apenas registra onde OpenJDK usa/testa dlopen.
+      # ============================================================
+
+      - name: Research dlopen requirements
+        shell: bash
+        run: |
+          set +e
+
+          {
+            echo "Minecraft-NX"
+            echo "OpenJDK dlopen Research v1.4"
+            echo "Created by Farbert_Took"
+
+            echo ""
+            echo "===== AUTOCONF ====="
+
+            grep \
+              -Rni \
+              -E \
+              'dlopen|dlsym|libdl|-ldl' \
+              openjdk21/make/autoconf \
+              2>/dev/null \
+              | head -n 1000
+
+            echo ""
+            echo "===== HOTSPOT ====="
+
+            grep \
+              -Rni \
+              -E \
+              'dlopen|dlsym|dlclose' \
+              openjdk21/src/hotspot \
+              2>/dev/null \
+              | head -n 2000
+
+          } > horizon-research/dlopen-research-v1.4.txt
+
+          exit 0
+
+
+      # ============================================================
+      # 27. Config logs
       # ============================================================
 
       - name: Collect OpenJDK config logs
@@ -1160,7 +1538,9 @@ jobs:
 
           while IFS= read -r FILEPATH
           do
+
             if [ -f "$FILEPATH" ]; then
+
               SAFE=$(
                 echo "$FILEPATH" \
                 | tr '/' '_'
@@ -1169,17 +1549,19 @@ jobs:
               cp \
                 "$FILEPATH" \
                 "horizon-research/$SAFE"
+
             fi
+
           done < horizon-research/config-files.txt
 
           exit 0
 
 
       # ============================================================
-      # 26. Final
+      # 28. Final report
       # ============================================================
 
-      - name: Final v1.3 report
+      - name: Final v1.4 report
         shell: bash
         run: |
           set -e
@@ -1187,7 +1569,7 @@ jobs:
           echo ""
           echo "========================================"
           echo " Minecraft-NX"
-          echo " OpenJDK Horizon Research v1.3"
+          echo " OpenJDK Horizon Research v1.4"
           echo " Created by Farbert_Took"
           echo "========================================"
 
@@ -1196,13 +1578,19 @@ jobs:
           echo "${FREETYPE_READY:-no}"
 
           echo ""
+          echo "FreeType library:"
+          echo "${FREETYPE_LIB:-not-found}"
+
+          echo ""
           echo "OpenJDK configure exit:"
           cat horizon-research/configure-exit-code.txt
 
           if [ -f horizon-research/hotspot-exit-code.txt ]; then
+
             echo ""
             echo "HotSpot build exit:"
             cat horizon-research/hotspot-exit-code.txt
+
           fi
 
           echo ""
@@ -1222,19 +1610,23 @@ jobs:
           echo "========================================"
           echo ""
           echo "X11 bypass nao implementa X11 no Horizon."
-          echo "Serve apenas para continuar a sondagem"
-          echo "do target headless experimental."
+          echo "CUPS/Fontconfig bypass tambem nao"
+          echo "implementam esses componentes."
           echo ""
-          echo "Configure=0 tambem nao significa que"
-          echo "HotSpot ja foi portado para Horizon."
+          echo "O objetivo atual e sondar os requisitos"
+          echo "do OpenJDK/HotSpot para um target"
+          echo "Horizon AArch64 headless/minimal."
+          echo ""
+          echo "Configure=0 nao significa que o"
+          echo "HotSpot ja foi portado."
 
 
       # ============================================================
-      # 27. Artifact
+      # 29. Artifact
       # ============================================================
 
-      - name: Upload Horizon Research v1.3
+      - name: Upload Horizon Research v1.4
         uses: actions/upload-artifact@v4
         with:
-          name: Minecraft-NX-Farbert_Took-OpenJDK-Horizon-v1.3
+          name: Minecraft-NX-Farbert_Took-OpenJDK-Horizon-v1.4
           path: horizon-research
