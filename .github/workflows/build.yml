@@ -42,31 +42,15 @@ jobs:
         run: |
           git clone --recursive https://github.com/XorTroll/javm-nx-poc.git
 
-      - name: Patch C++ compatibility
+      - name: Patch algorithm compatibility
         shell: bash
         run: |
-          python3 <<'PY'
-          from pathlib import Path
+          python3 -c 'from pathlib import Path; files=[Path("javm-nx-poc/libjavm/libjavm/include/javm/core/core_ClassObject.hpp"),Path("javm-nx-poc/libjavm/libjavm/include/javm/core/core_ManifestFile.hpp")]; [(p.write_text(("#include <algorithm>\n" if "#include <algorithm>" not in p.read_text() else "")+p.read_text())) for p in files]'
 
-          files = [
-              Path("javm-nx-poc/libjavm/libjavm/include/javm/core/core_ClassObject.hpp"),
-              Path("javm-nx-poc/libjavm/libjavm/include/javm/core/core_ManifestFile.hpp")
-          ]
-
-          for p in files:
-              s = p.read_text()
-
-              if "#include <algorithm>" not in s:
-                  s = "#include <algorithm>\n" + s
-
-              p.write_text(s)
-          PY
-
-      - name: Port nx hid Input to modern libnx
+      - name: Create modern HID Input
         shell: bash
         run: |
-          cat > javm-nx-poc/nx/native/nx/hid/Input.class.hpp <<'EOF'
-          #pragma once
+          python3 -c 'from pathlib import Path; p=Path("javm-nx-poc/nx/native/nx/hid/Input.class.hpp"); s="""#pragma once
 
           #include <nx_Include.hpp>
           #include <switch.h>
@@ -76,6 +60,7 @@ jobs:
               class Input : public native::Class {
 
                   private:
+
                       inline static PadState pad;
                       inline static bool initialized = false;
 
@@ -93,13 +78,22 @@ jobs:
                       }
 
                   public:
+
                       JAVM_NATIVE_CLASS_CTOR(Input) {
 
                           JAVM_NATIVE_CLASS_NAME("nx.hid.Input")
 
-                          JAVM_NATIVE_CLASS_REGISTER_STATIC_FN(getDownInput)
-                          JAVM_NATIVE_CLASS_REGISTER_STATIC_FN(getUpInput)
-                          JAVM_NATIVE_CLASS_REGISTER_STATIC_FN(getHeldInput)
+                          JAVM_NATIVE_CLASS_REGISTER_STATIC_FN(
+                              getDownInput
+                          )
+
+                          JAVM_NATIVE_CLASS_REGISTER_STATIC_FN(
+                              getUpInput
+                          )
+
+                          JAVM_NATIVE_CLASS_REGISTER_STATIC_FN(
+                              getHeldInput
+                          )
                       }
 
                       core::Value getDownInput(
@@ -108,8 +102,6 @@ jobs:
                       ) {
                           if(parameters.size() > 0) {
 
-                              // Mantemos o parametro controller para
-                              // compatibilidade com a API Java original.
                               auto controller =
                                   parameters[0].value->Get<long>();
 
@@ -184,9 +176,10 @@ jobs:
               };
 
           }
-          EOF
+          """; p.write_text(s)'
 
-      - name: Verify HID patch
+      - name: Verify HID registration
+        shell: bash
         run: |
           echo "=== Input.class.hpp ==="
           cat javm-nx-poc/nx/native/nx/hid/Input.class.hpp
@@ -195,19 +188,116 @@ jobs:
           echo "=== nx_Java.hpp ==="
           cat javm-nx-poc/nx/native/nx_Java.hpp
 
-          grep -q 'Input.class.hpp' \
+          grep -q "Input.class.hpp" \
             javm-nx-poc/nx/native/nx_Java.hpp
 
-          grep -q 'LoadNativeClass<hid::Input>' \
+          grep -q "LoadNativeClass<hid::Input>" \
             javm-nx-poc/nx/native/nx_Java.hpp
 
-          echo "HID registrado."
+          echo ""
+          echo "HID Input continua registrado"
 
       - name: Patch direct JAR launch
         shell: bash
         run: |
-          python3 <<'PY'
-          from pathlib import Path
+          python3 -c 'from pathlib import Path; p=Path("javm-nx-poc/javm/source/Main.cpp"); s=p.read_text(); marker="int main(int argc, char **argv)"; marker2="int main(int argc, char *argv[])"; marker=marker if marker in s else marker2; assert marker in s, "main nao encontrado"; start=s.index(marker); brace=s.index("{", start)+1; patch="\n    static char direct_app[] = \"javm.nro\";\n    static char direct_jar[] = \"sdmc:/switch/java-hello-world.jar\";\n    static char *direct_argv[] = { direct_app, direct_jar, nullptr };\n    argc = 2;\n    argv = direct_argv;\n"; p.write_text(s[:brace]+patch+s[brace:]); print(p.read_text())'
 
-          p = Path(
-              "javm-nx-poc/j
+      - name: Build JavaVM
+        working-directory: javm-nx-poc/javm
+        run: |
+          make clean || true
+          make -j2
+
+      - name: Build nx Java library
+        working-directory: javm-nx-poc/nx/java
+        run: |
+          mvn package
+
+      - name: Build Java Hello World
+        working-directory: javm-nx-poc/java-hello-world
+        run: |
+          mvn package
+
+      - name: Show generated files
+        shell: bash
+        run: |
+          echo "=== NRO ==="
+          find javm-nx-poc -type f -name "*.nro" -print
+
+          echo ""
+          echo "=== JAR ==="
+          find javm-nx-poc -type f -name "*.jar" -print
+
+          echo ""
+          echo "=== SD OUT ==="
+          find javm-nx-poc/sd_out -type f -print || true
+
+      - name: Prepare SD package
+        shell: bash
+        run: |
+          set -e
+
+          rm -rf SD
+          mkdir -p SD
+
+          if [ -d javm-nx-poc/sd_out ]; then
+            cp -r javm-nx-poc/sd_out/. SD/
+          fi
+
+          mkdir -p SD/switch/javm
+
+          JAVM_NRO=$(find javm-nx-poc/javm -type f -name "javm.nro" | head -n 1)
+
+          if [ -z "$JAVM_NRO" ]; then
+            echo "ERRO: javm.nro nao encontrado"
+            find javm-nx-poc -type f -name "*.nro" -print
+            exit 1
+          fi
+
+          echo "javm.nro encontrado:"
+          echo "$JAVM_NRO"
+
+          cp "$JAVM_NRO" SD/switch/javm/javm.nro
+
+          HELLO_JAR=$(find javm-nx-poc/java-hello-world/target -maxdepth 1 -type f -name "*.jar" | head -n 1)
+
+          if [ -z "$HELLO_JAR" ]; then
+            echo "ERRO: java-hello-world JAR nao encontrado"
+            find javm-nx-poc/java-hello-world -type f -name "*.jar" -print
+            exit 1
+          fi
+
+          echo "Hello World encontrado:"
+          echo "$HELLO_JAR"
+
+          mkdir -p SD/switch
+
+          cp "$HELLO_JAR" SD/switch/java-hello-world.jar
+
+          echo ""
+          echo "=== PACOTE FINAL ==="
+          find SD -type f -print
+
+      - name: Verify SD package
+        shell: bash
+        run: |
+          set -e
+
+          test -f SD/switch/javm/javm.nro
+          test -f SD/switch/java-hello-world.jar
+
+          echo "=== JAVM ==="
+          ls -lh SD/switch/javm/javm.nro
+
+          echo ""
+          echo "=== HELLO WORLD ==="
+          ls -lh SD/switch/java-hello-world.jar
+
+          echo ""
+          echo "PACOTE JAVA HID OK"
+
+      - name: Upload Java HID test
+        uses: actions/upload-artifact@v4
+        with:
+          name: Minecraft-NX-Java-HID-Test
+          path: SD
