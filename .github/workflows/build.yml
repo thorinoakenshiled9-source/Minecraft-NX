@@ -31,20 +31,75 @@ jobs:
       image: devkitpro/devkita64:latest
 
     steps:
-      - name: Install git
+      - name: Install tools
         run: |
           apt-get update
-          apt-get install -y git
+          apt-get install -y git python3
 
       - name: Clone JavaVM
         run: |
           git clone --recursive https://github.com/XorTroll/javm-nx-poc.git
 
-      - name: Patch algorithm
+      - name: Patch JavaVM
+        shell: bash
         run: |
-          sed -i '1i #include <algorithm>' javm-nx-poc/libjavm/libjavm/include/javm/core/core_ClassObject.hpp
-          sed -i '1i #include <algorithm>' javm-nx-poc/libjavm/libjavm/include/javm/core/core_ManifestFile.hpp
+          python3 <<'PY'
+          from pathlib import Path
 
-      - name: Disable old HID
+          root = Path("javm-nx-poc")
+
+          files = [
+              root / "libjavm/libjavm/include/javm/core/core_ClassObject.hpp",
+              root / "libjavm/libjavm/include/javm/core/core_ManifestFile.hpp",
+          ]
+
+          for path in files:
+              text = path.read_text()
+
+              if "#include <algorithm>" not in text:
+                  text = "#include <algorithm>\n" + text
+
+              path.write_text(text)
+
+          path = root / "nx/native/nx_Java.hpp"
+          text = path.read_text()
+
+          lines = []
+
+          for line in text.splitlines():
+              if "Input.class.hpp" in line:
+                  continue
+
+              if "LoadNativeClass<hid::Input>" in line:
+                  continue
+
+              lines.append(line)
+
+          path.write_text("\n".join(lines) + "\n")
+
+          print("Patch aplicado.")
+          print()
+          print("=== nx_Java.hpp ===")
+          print(path.read_text())
+          PY
+
+      - name: Build JavaVM
+        working-directory: javm-nx-poc/javm
+        run: make -j2
+
+      - name: Find JavaVM
         run: |
-          sed -
+          echo "=== NRO encontrados ==="
+          find javm-nx-poc -type f -name "*.nro" -print
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p output
+          find javm-nx-poc -type f -name "*.nro" -exec cp {} output/ \;
+          ls -lah output
+
+      - name: Upload JavaVM
+        uses: actions/upload-artifact@v4
+        with:
+          name: Minecraft-NX-JavaVM
+          path: output
