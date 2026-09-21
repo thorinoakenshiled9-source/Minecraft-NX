@@ -1,4 +1,4 @@
-name: OpenJDK Horizon Research v1.7
+name: OpenJDK Horizon Research v1.8
 
 on:
   workflow_dispatch:
@@ -20,24 +20,22 @@ jobs:
 
       # ============================================================
       # Minecraft-NX
-      # OpenJDK Horizon Research v1.7
+      # OpenJDK Horizon Research v1.8
       # Created by Farbert_Took
       #
-      # v1.6:
-      #   configure = OK
-      #   JvmMapfile Horizon = OK
-      #   HotSpot entrou na compilacao de libjvm
-      #
-      # Primeiro erro:
-      #   globalDefinitions_gcc.hpp
-      #   fatal error: dlfcn.h: No such file or directory
-      #
       # v1.7:
-      #   - preserva os patches conhecidos
-      #   - pesquisa dlfcn/dlopen/dlsym
-      #   - desativa apenas o include dlfcn.h para __SWITCH__
-      #   - NAO cria implementacoes falsas de dlopen/dlsym
-      #   - executa novo make hotspot
+      #   configure = OK
+      #   JvmMapfile = OK
+      #   patch dlfcn entrou
+      #   __SWITCH__ nao chegou ao HotSpot
+      #
+      # v1.8:
+      #   cria macro proprio:
+      #     MINECRAFT_NX_HORIZON=1
+      #
+      #   adiciona macro nas flags reais do HotSpot
+      #   remove dlfcn.h somente para esse target
+      #   captura comandos reais do compilador
       # ============================================================
 
 
@@ -79,13 +77,13 @@ jobs:
           echo ""
           echo "========================================"
           echo " Minecraft-NX"
-          echo " OpenJDK Horizon Research v1.7"
+          echo " OpenJDK Horizon Research v1.8"
           echo " Created by Farbert_Took"
           echo "========================================"
 
 
       # ============================================================
-      # 2. devkitA64 PATH
+      # 2. PATH
       # ============================================================
 
       - name: Configure devkitA64 PATH
@@ -101,7 +99,7 @@ jobs:
       # 3. Workspace
       # ============================================================
 
-      - name: Prepare directories
+      - name: Prepare workspace
         shell: bash
         run: |
           set -e
@@ -114,14 +112,16 @@ jobs:
 
           {
             echo "Minecraft-NX"
-            echo "OpenJDK Horizon Research v1.7"
+            echo "OpenJDK Horizon Research v1.8"
             echo "Created by Farbert_Took"
             echo ""
             echo "Target: Nintendo Switch Horizon"
             echo "CPU: AArch64"
             echo "JVM: OpenJDK 21 HotSpot minimal"
             echo "Mode: headless"
-            echo "Current research: dlfcn.h / dynamic loading"
+            echo ""
+            echo "Target macro:"
+            echo "MINECRAFT_NX_HORIZON=1"
           } > horizon-research/info.txt
 
 
@@ -145,100 +145,46 @@ jobs:
           aarch64-none-elf-g++ --version \
             | tee horizon-research/gxx-version.txt
 
-          aarch64-none-elf-nm --version \
-            | tee horizon-research/nm-version.txt
-
 
       # ============================================================
-      # 5. Teste Horizon
+      # 5. Teste do nosso macro
       # ============================================================
 
-      - name: Verify Horizon AArch64 compilation
+      - name: Test Minecraft-NX Horizon macro
         shell: bash
         run: |
           set -e
 
-          cat > horizon-research/horizon-test.c <<'EOF'
-          #include <switch.h>
+          cat > horizon-research/macro-test.cpp <<'EOF'
+          #ifndef MINECRAFT_NX_HORIZON
+          #error MINECRAFT_NX_HORIZON is missing
+          #endif
 
-          int minecraft_nx_horizon(void)
+          #if MINECRAFT_NX_HORIZON != 1
+          #error MINECRAFT_NX_HORIZON has wrong value
+          #endif
+
+          int minecraft_nx_horizon_test()
           {
-              u64 java_version = 21;
-              return (int)java_version;
+              return MINECRAFT_NX_HORIZON;
           }
           EOF
 
-          aarch64-none-elf-gcc \
+          aarch64-none-elf-g++ \
             -march=armv8-a \
-            -D__SWITCH__ \
-            -I/opt/devkitpro/libnx/include \
+            -DMINECRAFT_NX_HORIZON=1 \
             -c \
-            horizon-research/horizon-test.c \
-            -o horizon-research/horizon-test.o
+            horizon-research/macro-test.cpp \
+            -o horizon-research/macro-test.o
 
-          file horizon-research/horizon-test.o \
-            | tee horizon-research/horizon-object.txt
+          file horizon-research/macro-test.o
 
-
-      # ============================================================
-      # 6. Pesquisa headers do devkitA64/libnx
-      # ============================================================
-
-      - name: Research Horizon dynamic loading headers
-        shell: bash
-        run: |
-          set +e
-
-          {
-            echo "========================================"
-            echo " Minecraft-NX"
-            echo " Horizon Dynamic Loading Research"
-            echo " Created by Farbert_Took"
-            echo "========================================"
-
-            echo ""
-            echo "===== dlfcn.h ====="
-            echo ""
-
-            find \
-              /opt/devkitpro \
-              -type f \
-              -name 'dlfcn.h' \
-              -print \
-              2>/dev/null
-
-            echo ""
-            echo "===== dlopen/dlsym/dlclose ====="
-            echo ""
-
-            grep \
-              -Rni \
-              -E '\b(dlopen|dlsym|dlclose|dlerror)\b' \
-              /opt/devkitpro/libnx/include \
-              /opt/devkitpro/devkitA64/aarch64-none-elf/include \
-              2>/dev/null \
-              | head -n 1000
-
-            echo ""
-            echo "===== NRO/NRO0/DYNAMIC LOADER REFERENCES ====="
-            echo ""
-
-            grep \
-              -Rni \
-              -E 'nro|Nro|NRO|dynamic.*load|loader|ro:|ldr:' \
-              /opt/devkitpro/libnx/include \
-              2>/dev/null \
-              | head -n 1500
-
-          } > horizon-research/horizon-dynamic-loading.txt
-
-          cat horizon-research/horizon-dynamic-loading.txt
-
-          exit 0
+          echo ""
+          echo "MINECRAFT_NX_HORIZON macro test: OK"
 
 
       # ============================================================
-      # 7. Boot JDK
+      # 6. Boot JDK
       # ============================================================
 
       - name: Download Boot JDK 20
@@ -267,7 +213,7 @@ jobs:
 
 
       # ============================================================
-      # 8. FreeType source
+      # 7. FreeType
       # ============================================================
 
       - name: Clone FreeType
@@ -288,7 +234,7 @@ jobs:
 
 
       # ============================================================
-      # 9. FreeType configure
+      # 8. Configure FreeType
       # ============================================================
 
       - name: Configure FreeType for Horizon
@@ -330,7 +276,7 @@ jobs:
 
 
       # ============================================================
-      # 10. FreeType build
+      # 9. Build FreeType
       # ============================================================
 
       - name: Build FreeType for Horizon
@@ -344,8 +290,7 @@ jobs:
 
           if [ "$CONFIG_STATUS" != "0" ]; then
 
-            echo "FreeType configure failed." \
-              | tee horizon-research/freetype-build.log
+            echo "FreeType configure failed."
 
             echo "1" \
               > horizon-research/freetype-build-exit.txt
@@ -365,16 +310,18 @@ jobs:
             > ../horizon-research/freetype-build-exit.txt
 
           if [ "$STATUS" = "0" ]; then
+
             ninja install \
               2>&1 \
               | tee ../horizon-research/freetype-install.log
+
           fi
 
           exit 0
 
 
       # ============================================================
-      # 11. FreeType validation
+      # 10. Validate FreeType
       # ============================================================
 
       - name: Validate Horizon FreeType
@@ -407,16 +354,12 @@ jobs:
           echo "FREETYPE_LIBDIR=$FREETYPE_LIBDIR" >> "$GITHUB_ENV"
 
           echo ""
-          echo "FreeType:"
+          echo "FreeType ready:"
           echo "$FREETYPE_LIB"
-
-          ls -lh "$FREETYPE_LIB"
-
-          exit 0
 
 
       # ============================================================
-      # 12. OpenJDK
+      # 11. OpenJDK
       # ============================================================
 
       - name: Clone OpenJDK 21
@@ -436,7 +379,7 @@ jobs:
 
 
       # ============================================================
-      # 13. elf -> horizon
+      # 12. elf -> horizon
       # ============================================================
 
       - name: Add Horizon OS mapping
@@ -507,10 +450,10 @@ jobs:
 
 
       # ============================================================
-      # 14. CUPS
+      # 13. CUPS
       # ============================================================
 
-      - name: Apply Horizon CUPS research bypass
+      - name: Apply Horizon CUPS bypass
         shell: bash
         run: |
           set -e
@@ -531,13 +474,26 @@ jobs:
                   break
 
           if target is None:
-              raise SystemExit("CUPS check not found")
+              raise SystemExit(
+                  "CUPS check not found"
+              )
 
           text = target.read_text()
 
-          pos = text.find("Could not find cups")
-          start = text.rfind("\n", 0, pos) + 1
-          end = text.find("\n", pos)
+          pos = text.find(
+              "Could not find cups"
+          )
+
+          start = text.rfind(
+              "\n",
+              0,
+              pos
+          ) + 1
+
+          end = text.find(
+              "\n",
+              pos
+          )
 
           if end < 0:
               end = len(text)
@@ -545,7 +501,8 @@ jobs:
           original = text[start:end]
 
           indent = original[
-              :len(original) - len(original.lstrip())
+              :len(original)
+              - len(original.lstrip())
           ]
 
           replacement = (
@@ -573,15 +530,15 @@ jobs:
 
           target.write_text(text)
 
-          print("Horizon CUPS bypass installed")
+          print("CUPS Horizon bypass installed")
           PY
 
 
       # ============================================================
-      # 15. Fontconfig
+      # 14. Fontconfig
       # ============================================================
 
-      - name: Apply Horizon Fontconfig research bypass
+      - name: Apply Horizon Fontconfig bypass
         shell: bash
         run: |
           set -e
@@ -659,16 +616,16 @@ jobs:
           target.write_text(text)
 
           print(
-              "Horizon Fontconfig bypass installed"
+              "Fontconfig Horizon bypass installed"
           )
           PY
 
 
       # ============================================================
-      # 16. FreeType statico
+      # 15. FreeType static
       # ============================================================
 
-      - name: Add static FreeType detection for Horizon
+      - name: Add static FreeType detection
         shell: bash
         run: |
           set -e
@@ -693,7 +650,7 @@ jobs:
 
           if s.count(old) != 1:
               raise SystemExit(
-                  "Expected exactly one FreeType library expression"
+                  "FreeType expression not found exactly once"
               )
 
           s = s.replace(
@@ -705,16 +662,16 @@ jobs:
           p.write_text(s)
 
           print(
-              "Horizon static FreeType patch installed"
+              "Static FreeType Horizon patch installed"
           )
           PY
 
 
       # ============================================================
-      # 17. X11
+      # 16. X11
       # ============================================================
 
-      - name: Apply complete Horizon headless X11 bypass
+      - name: Apply Horizon X11 bypass
         shell: bash
         run: |
           set -e
@@ -788,11 +745,14 @@ jobs:
               original_body = original.rstrip("\n")
 
               if label == "X11 libraries":
+
                   warning = (
                       "X11 libraries disabled for "
                       "experimental Horizon headless target"
                   )
+
               else:
+
                   warning = (
                       "X11 headers disabled for "
                       "experimental Horizon headless target"
@@ -819,16 +779,19 @@ jobs:
 
               lines[i] = replacement
 
-              p.write_text("".join(lines))
+              p.write_text(
+                  "".join(lines)
+              )
 
-          print(
-              "Horizon X11 bypass installed"
-          )
+          print("X11 Horizon bypass installed")
           PY
 
 
       # ============================================================
-      # 18. Configure
+      # 17. Configure OpenJDK
+      #
+      # IMPORTANTE:
+      # adicionamos nosso macro diretamente em CFLAGS/CXXFLAGS.
       # ============================================================
 
       - name: Configure OpenJDK Horizon
@@ -839,7 +802,7 @@ jobs:
           if [ "$FREETYPE_READY" != "yes" ]; then
 
             echo "FreeType unavailable" \
-              > horizon-research/configure-v1.7.log
+              > horizon-research/configure-v1.8.log
 
             echo "99" \
               > horizon-research/configure-exit-code.txt
@@ -865,8 +828,10 @@ jobs:
             NM=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-nm \
             OBJCOPY=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-objcopy \
             STRIP=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-strip \
+            CFLAGS="-DMINECRAFT_NX_HORIZON=1" \
+            CXXFLAGS="-DMINECRAFT_NX_HORIZON=1" \
             2>&1 \
-            | tee ../horizon-research/configure-v1.7.log
+            | tee ../horizon-research/configure-v1.8.log
 
           STATUS=${PIPESTATUS[0]}
 
@@ -877,7 +842,74 @@ jobs:
 
 
       # ============================================================
-      # 19. JvmMapfile Horizon
+      # 18. Configure result
+      # ============================================================
+
+      - name: Show configure result
+        shell: bash
+        run: |
+          set -e
+
+          echo ""
+          echo "========================================"
+          echo " CONFIGURE RESULT v1.8"
+          echo "========================================"
+          echo ""
+
+          STATUS=$(
+            cat horizon-research/configure-exit-code.txt
+          )
+
+          echo "Configure exit:"
+          echo "$STATUS"
+
+          echo ""
+
+          grep \
+            -i \
+            -E \
+            'error|warning|horizon|aarch64|minimal|headless|freetype|x11|cups|fontconfig' \
+            horizon-research/configure-v1.8.log \
+            | tail -n 1000 \
+            || true
+
+
+      # ============================================================
+      # 19. Verifica se macro entrou no spec.gmk
+      # ============================================================
+
+      - name: Verify Horizon macro in generated build configuration
+        shell: bash
+        run: |
+          set +e
+
+          {
+            echo "========================================"
+            echo " Minecraft-NX"
+            echo " Generated Flag Research v1.8"
+            echo "========================================"
+            echo ""
+
+            echo "Searching generated configuration..."
+            echo ""
+
+            grep \
+              -Rni \
+              'MINECRAFT_NX_HORIZON' \
+              openjdk21/build \
+              2>/dev/null \
+              | head -n 1000
+
+          } > horizon-research/generated-horizon-flags-v1.8.txt
+
+          cat \
+            horizon-research/generated-horizon-flags-v1.8.txt
+
+          exit 0
+
+
+      # ============================================================
+      # 20. JvmMapfile
       # ============================================================
 
       - name: Add Horizon support to JvmMapfile
@@ -925,10 +957,8 @@ jobs:
           horizon_branch = r'''else ifeq ($(call isTargetOs, horizon), true)
             # Minecraft-NX / Horizon
             #
-            # Horizon AArch64 object files are ELF objects generated
+            # Horizon AArch64 uses ELF objects generated
             # by the devkitA64 GNU toolchain.
-            #
-            # This branch only controls HotSpot symbol extraction.
             DUMP_SYMBOLS_CMD := $(NM) $(NMFLAGS) --defined-only *$(OBJ_SUFFIX)
             ifneq ($(FILTER_SYMBOLS_PATTERN), )
               FILTER_SYMBOLS_PATTERN := $(FILTER_SYMBOLS_PATTERN)|
@@ -951,41 +981,35 @@ jobs:
           p.write_text(s)
 
           print(
-              "JvmMapfile Horizon ELF branch installed"
+              "JvmMapfile Horizon branch installed"
           )
           PY
 
-          git -C openjdk21 diff \
-            -- make/hotspot/lib/JvmMapfile.gmk \
-            | tee horizon-research/JvmMapfile-patch-v1.7.diff
-
 
       # ============================================================
-      # 20. Pesquisa dlfcn dentro do OpenJDK
+      # 21. Pesquisa original dlfcn
       # ============================================================
 
-      - name: Research OpenJDK dlfcn usage
+      - name: Research original dlfcn usage
         shell: bash
         run: |
           set +e
 
           {
             echo "========================================"
-            echo " Minecraft-NX"
-            echo " OpenJDK dlfcn Research v1.7"
-            echo " Created by Farbert_Took"
+            echo " DLFCN RESEARCH BEFORE PATCH v1.8"
             echo "========================================"
-
             echo ""
+
             echo "===== globalDefinitions_gcc.hpp ====="
             echo ""
 
             nl -ba \
               openjdk21/src/hotspot/share/utilities/globalDefinitions_gcc.hpp \
-              | head -n 160
+              | head -n 140
 
             echo ""
-            echo "===== #include dlfcn.h ====="
+            echo "===== DLFCN INCLUDES ====="
             echo ""
 
             grep \
@@ -996,44 +1020,26 @@ jobs:
               | head -n 1000
 
             echo ""
-            echo "===== dlopen/dlsym/dlclose/dlerror ====="
+            echo "===== DLOPEN / DLSYM ====="
             echo ""
 
             grep \
               -Rni \
-              -E '\b(dlopen|dlsym|dlclose|dlerror)\b' \
+              -E '\b(dlopen|dlsym|dlclose|dlerror|RTLD_[A-Za-z0-9_]+)\b' \
               openjdk21/src/hotspot \
               2>/dev/null \
-              | head -n 4000
+              | head -n 5000
 
-            echo ""
-            echo "===== RTLD ====="
-            echo ""
-
-            grep \
-              -Rni \
-              -E '\bRTLD_[A-Za-z0-9_]+' \
-              openjdk21/src/hotspot \
-              2>/dev/null \
-              | head -n 4000
-
-          } > horizon-research/openjdk-dlfcn-research-v1.7.txt
-
-          cat \
-            horizon-research/openjdk-dlfcn-research-v1.7.txt
+          } > horizon-research/dlfcn-before-v1.8.txt
 
           exit 0
 
 
       # ============================================================
-      # 21. Patch SOMENTE do include dlfcn.h
-      #
-      # Nao implementamos dlopen/dlsym.
-      # Apenas removemos o bloqueio global do header para descobrir
-      # onde a API e realmente necessaria.
+      # 22. Corrige dlfcn.h
       # ============================================================
 
-      - name: Isolate dlfcn include for Horizon
+      - name: Disable global dlfcn include for Minecraft-NX Horizon
         shell: bash
         run: |
           set -e
@@ -1055,17 +1061,25 @@ jobs:
 
           old = "#include <dlfcn.h>"
 
-          if s.count(old) != 1:
+          count = s.count(old)
+
+          print(
+              f"dlfcn include count before patch: {count}"
+          )
+
+          if count != 1:
               raise SystemExit(
-                  f"Expected exactly one dlfcn include, "
-                  f"found {s.count(old)}"
+                  "Expected exactly one dlfcn.h include"
               )
 
-          new = '''// Minecraft-NX / Horizon:
-          // Horizon/libnx does not provide the POSIX dlfcn.h API.
-          // Do not include it globally for Switch builds.
-          // Actual dynamic-loader usages are handled separately.
-          #if !defined(__SWITCH__)
+          new = '''// Minecraft-NX / Horizon
+          //
+          // Horizon does not expose the POSIX dlfcn interface.
+          // Do not pull dlfcn.h into every HotSpot translation unit.
+          //
+          // Actual dynamic loading requirements will be ported
+          // separately instead of emulating Linux here.
+          #if !defined(MINECRAFT_NX_HORIZON)
           #include <dlfcn.h>
           #endif'''
 
@@ -1077,85 +1091,99 @@ jobs:
 
           p.write_text(s)
 
-          print("")
-          print("========================================")
-          print(" DLFCN INCLUDE ISOLATED FOR HORIZON")
-          print("========================================")
-          print("")
-          print("No fake dlopen/dlsym implementation added.")
-          print("")
+          print(
+              "dlfcn.h isolated using "
+              "MINECRAFT_NX_HORIZON"
+          )
           PY
 
-          git -C openjdk21 diff \
-            -- src/hotspot/share/utilities/globalDefinitions_gcc.hpp \
-            | tee horizon-research/dlfcn-include-patch-v1.7.diff
+          echo ""
+          echo "===== PATCHED HEADER ====="
+          echo ""
+
+          nl -ba \
+            openjdk21/src/hotspot/share/utilities/globalDefinitions_gcc.hpp \
+            | head -n 100 \
+            | tee horizon-research/globalDefinitions-patched-v1.8.txt
 
 
       # ============================================================
-      # 22. Verifica __SWITCH__
+      # 23. Verifica preprocessor manualmente
       # ============================================================
 
-      - name: Verify Switch preprocessor macro
+      - name: Verify dlfcn condition with target compiler
         shell: bash
         run: |
-          set +e
+          set -e
 
+          cat > horizon-research/dlfcn-condition-test.cpp <<'EOF'
+          #if !defined(MINECRAFT_NX_HORIZON)
+          #include <dlfcn.h>
+          #endif
+
+          #ifndef MINECRAFT_NX_HORIZON
+          #error Horizon macro missing
+          #endif
+
+          int main()
           {
-            echo "========================================"
-            echo " __SWITCH__ CHECK"
-            echo "========================================"
-            echo ""
+              return 0;
+          }
+          EOF
 
-            echo | \
-              aarch64-none-elf-g++ \
-              -D__SWITCH__ \
-              -dM \
-              -E \
-              -x c++ - \
-              | grep -E '__SWITCH__|__aarch64__'
+          aarch64-none-elf-g++ \
+            -DMINECRAFT_NX_HORIZON=1 \
+            -c \
+            horizon-research/dlfcn-condition-test.cpp \
+            -o horizon-research/dlfcn-condition-test.o
 
-          } | tee horizon-research/switch-macros-v1.7.txt
-
-          exit 0
+          echo ""
+          echo "========================================"
+          echo " DLFCN CONDITION TEST = OK"
+          echo "========================================"
+          echo ""
 
 
       # ============================================================
-      # 23. Patch completo
+      # 24. Salva patch
       # ============================================================
 
-      - name: Save complete Horizon patch
+      - name: Save complete Horizon v1.8 patch
         shell: bash
         run: |
           set -e
 
           git -C openjdk21 diff \
-            > horizon-research/openjdk-horizon-v1.7.patch
+            > horizon-research/openjdk-horizon-v1.8.patch
 
           echo ""
           echo "Patch lines:"
           echo ""
 
           wc -l \
-            horizon-research/openjdk-horizon-v1.7.patch
+            horizon-research/openjdk-horizon-v1.8.patch
 
           echo ""
-          echo "Horizon/dlfcn changes:"
+          echo "Relevant changes:"
           echo ""
 
           grep \
             -n \
             -i \
-            -E 'horizon|switch|dlfcn' \
-            horizon-research/openjdk-horizon-v1.7.patch \
-            | head -n 2000 \
+            -E \
+            'horizon|minecraft_nx|dlfcn|freetype|x11|cups|fontconfig' \
+            horizon-research/openjdk-horizon-v1.8.patch \
+            | head -n 3000 \
             || true
 
 
       # ============================================================
-      # 24. HOTSPOT PROBE
+      # 25. HOTSPOT PROBE
+      #
+      # LOG=trace para termos mais informacao.
       # ============================================================
 
-      - name: Probe HotSpot build v1.7
+      - name: Probe HotSpot build v1.8
         shell: bash
         run: |
           set +e
@@ -1169,7 +1197,7 @@ jobs:
             {
               echo "========================================"
               echo " Minecraft-NX"
-              echo " HOTSPOT PROBE v1.7"
+              echo " HOTSPOT PROBE v1.8"
               echo " Created by Farbert_Took"
               echo "========================================"
               echo ""
@@ -1178,10 +1206,10 @@ jobs:
               echo "Configure exit:"
               echo "$CONFIG_STATUS"
 
-            } > horizon-research/hotspot-summary-v1.7.txt
+            } > horizon-research/hotspot-summary-v1.8.txt
 
             cat \
-              horizon-research/hotspot-summary-v1.7.txt
+              horizon-research/hotspot-summary-v1.8.txt
 
             exit 0
           fi
@@ -1191,13 +1219,15 @@ jobs:
           echo ""
           echo "========================================"
           echo " OPENJDK CONFIGURE = 0"
-          echo " STARTING HOTSPOT PROBE v1.7"
+          echo " STARTING HOTSPOT PROBE v1.8"
           echo "========================================"
           echo ""
 
-          make hotspot \
+          make \
+            LOG=trace \
+            hotspot \
             2>&1 \
-            | tee ../horizon-research/hotspot-build-v1.7.log
+            | tee ../horizon-research/hotspot-build-v1.8.log
 
           STATUS=${PIPESTATUS[0]}
 
@@ -1207,7 +1237,7 @@ jobs:
           {
             echo "========================================"
             echo " Minecraft-NX"
-            echo " HOTSPOT PROBE v1.7"
+            echo " HOTSPOT PROBE v1.8"
             echo " Created by Farbert_Took"
             echo "========================================"
 
@@ -1216,35 +1246,95 @@ jobs:
             echo "$STATUS"
 
             echo ""
-            echo "Relevant messages:"
+            echo "===== MACRO IN BUILD LOG ====="
+            echo ""
+
+            grep \
+              -n \
+              -m 100 \
+              'MINECRAFT_NX_HORIZON' \
+              ../horizon-research/hotspot-build-v1.8.log \
+              || true
+
+            echo ""
+            echo "===== RELEVANT MESSAGES ====="
             echo ""
 
             grep \
               -i \
               -E \
-              'error|fatal|horizon|switch|aarch64|dlfcn|dlopen|dlsym|dlclose|dlerror|RTLD|os_cpu|os/|not found|no rule|undefined|unsupported|missing|posix|linux|pthread|signal|mmap|munmap|mprotect|clock|gettimeofday|thread|socket|atomic|errno|mapfile' \
-              ../horizon-research/hotspot-build-v1.7.log \
-              | tail -n 10000 \
+              'error|fatal|horizon|minecraft_nx|aarch64|dlfcn|dlopen|dlsym|dlclose|dlerror|RTLD|os_cpu|os/|not found|no rule|undefined|unsupported|missing|posix|linux|pthread|signal|mmap|munmap|mprotect|clock|gettimeofday|thread|socket|atomic|errno|mapfile' \
+              ../horizon-research/hotspot-build-v1.8.log \
+              | tail -n 12000 \
               || true
 
             echo ""
-            echo "===== LAST 2500 ====="
+            echo "===== LAST 3000 ====="
             echo ""
 
             tail \
-              -n 2500 \
-              ../horizon-research/hotspot-build-v1.7.log
+              -n 3000 \
+              ../horizon-research/hotspot-build-v1.8.log
 
-          } > ../horizon-research/hotspot-summary-v1.7.txt
+          } > ../horizon-research/hotspot-summary-v1.8.txt
 
           cat \
-            ../horizon-research/hotspot-summary-v1.7.txt
+            ../horizon-research/hotspot-summary-v1.8.txt
 
           exit 0
 
 
       # ============================================================
-      # 25. Primeiro erro
+      # 26. Confirma macro no comando REAL
+      # ============================================================
+
+      - name: Verify macro reached HotSpot compiler
+        shell: bash
+        run: |
+          set +e
+
+          LOG="horizon-research/hotspot-build-v1.8.log"
+
+          {
+            echo "========================================"
+            echo " Minecraft-NX"
+            echo " HotSpot Macro Verification v1.8"
+            echo "========================================"
+            echo ""
+
+            if grep -q \
+              'MINECRAFT_NX_HORIZON' \
+              "$LOG"
+            then
+
+              echo "RESULT: FOUND"
+              echo ""
+
+              grep \
+                -n \
+                -m 100 \
+                'MINECRAFT_NX_HORIZON' \
+                "$LOG"
+
+            else
+
+              echo "RESULT: NOT FOUND"
+              echo ""
+              echo "The generated HotSpot command did not"
+              echo "show MINECRAFT_NX_HORIZON."
+
+            fi
+
+          } > horizon-research/hotspot-macro-verification-v1.8.txt
+
+          cat \
+            horizon-research/hotspot-macro-verification-v1.8.txt
+
+          exit 0
+
+
+      # ============================================================
+      # 27. Primeiro erro
       # ============================================================
 
       - name: Extract first HotSpot failure
@@ -1252,18 +1342,20 @@ jobs:
         run: |
           set +e
 
-          LOG="horizon-research/hotspot-build-v1.7.log"
+          LOG="horizon-research/hotspot-build-v1.8.log"
 
           {
             echo "========================================"
             echo " Minecraft-NX"
-            echo " FIRST HOTSPOT FAILURE v1.7"
+            echo " FIRST HOTSPOT FAILURE v1.8"
             echo " Created by Farbert_Took"
             echo "========================================"
             echo ""
 
             if [ ! -f "$LOG" ]; then
-              echo "HotSpot log not available."
+
+              echo "HotSpot log unavailable."
+
               exit 0
             fi
 
@@ -1272,14 +1364,14 @@ jobs:
 
             grep \
               -n \
-              -m 120 \
+              -m 150 \
               -E \
               '(^|[^A-Za-z])(error:|fatal error:|Error [0-9]|undefined reference|No such file|No rule to make target|Unknown target|unsupported|Unsupported)' \
               "$LOG" \
               || true
 
             echo ""
-            echo "===== DLFCN / LOADER ====="
+            echo "===== DLFCN ====="
             echo ""
 
             grep \
@@ -1299,23 +1391,23 @@ jobs:
               -m 500 \
               -i \
               -E \
-              'horizon|switch|os_cpu|src/hotspot/os/' \
+              'horizon|minecraft_nx|os_cpu|src/hotspot/os/' \
               "$LOG" \
               || true
 
-          } > horizon-research/first-hotspot-failure-v1.7.txt
+          } > horizon-research/first-hotspot-failure-v1.8.txt
 
           cat \
-            horizon-research/first-hotspot-failure-v1.7.txt
+            horizon-research/first-hotspot-failure-v1.8.txt
 
           exit 0
 
 
       # ============================================================
-      # 26. Failure command lines
+      # 28. Failure logs
       # ============================================================
 
-      - name: Collect HotSpot failure command lines
+      - name: Collect HotSpot failure logs
         shell: bash
         run: |
           set +e
@@ -1329,9 +1421,8 @@ jobs:
 
             find "$ROOT" \
               -type f \
-              -maxdepth 2 \
               -print \
-              | tee horizon-research/failure-log-files-v1.7.txt
+              | tee horizon-research/failure-log-files-v1.8.txt
 
             cp -R \
               "$ROOT"/. \
@@ -1345,67 +1436,62 @@ jobs:
 
 
       # ============================================================
-      # 27. Procura headers que provavelmente serao proximos
+      # 29. Procura dlfcn depois do build
       # ============================================================
 
-      - name: Research Horizon missing POSIX headers
+      - name: Analyze remaining dynamic loader requirements
         shell: bash
         run: |
           set +e
 
           {
             echo "========================================"
-            echo " Minecraft-NX"
-            echo " POSIX Header Research v1.7"
-            echo " Created by Farbert_Took"
+            echo " Dynamic Loader Requirements v1.8"
             echo "========================================"
+            echo ""
 
-            for HEADER in \
-              dlfcn.h \
-              pthread.h \
-              signal.h \
-              sys/mman.h \
-              sys/socket.h \
-              sys/time.h \
-              unistd.h \
-              fcntl.h \
-              dirent.h
-            do
+            echo "===== HOTSPOT DLOPEN ====="
+            echo ""
 
-              echo ""
-              echo "===== $HEADER ====="
+            grep \
+              -Rni \
+              -E '\b(dlopen|dlsym|dlclose|dlerror)\b' \
+              openjdk21/src/hotspot \
+              2>/dev/null \
+              | head -n 5000
 
-              FOUND=$(
-                find \
-                  /opt/devkitpro/devkitA64/aarch64-none-elf/include \
-                  /opt/devkitpro/libnx/include \
-                  -path "*/$HEADER" \
-                  -print \
-                  2>/dev/null \
-                  | head -n 20
-              )
+            echo ""
+            echo "===== HOTSPOT RTLD ====="
+            echo ""
 
-              if [ -n "$FOUND" ]; then
-                echo "$FOUND"
-              else
-                echo "NOT FOUND"
-              fi
+            grep \
+              -Rni \
+              -E '\bRTLD_[A-Za-z0-9_]+' \
+              openjdk21/src/hotspot \
+              2>/dev/null \
+              | head -n 5000
 
-            done
+            echo ""
+            echo "===== DYNAMIC LOADER IN LIBNX ====="
+            echo ""
 
-          } > horizon-research/posix-header-research-v1.7.txt
+            grep \
+              -Rni \
+              -E 'nro|Nro|NRO|roInitialize|ldr|LoadNro|loadNro' \
+              /opt/devkitpro/libnx/include \
+              2>/dev/null \
+              | head -n 3000
 
-          cat \
-            horizon-research/posix-header-research-v1.7.txt
+          } > horizon-research/dynamic-loader-research-v1.8.txt
 
           exit 0
 
 
       # ============================================================
-      # 28. Summary
+      # 30. Summary
       # ============================================================
 
-      - name: Final v1.7 summary
+      - name: Final v1.8 summary
         shell: bash
         run: |
           set -e
@@ -1413,7 +1499,7 @@ jobs:
           {
             echo "========================================"
             echo " Minecraft-NX"
-            echo " OpenJDK Horizon Research v1.7"
+            echo " OpenJDK Horizon Research v1.8"
             echo " Created by Farbert_Took"
             echo "========================================"
 
@@ -1439,11 +1525,15 @@ jobs:
 
             echo ""
             echo "JvmMapfile:"
-            echo "Horizon ELF/GNU nm branch installed"
+            echo "Horizon ELF/GNU nm"
+
+            echo ""
+            echo "Target macro:"
+            echo "MINECRAFT_NX_HORIZON=1"
 
             echo ""
             echo "dlfcn.h:"
-            echo "global include isolated for __SWITCH__"
+            echo "conditional on MINECRAFT_NX_HORIZON"
 
             echo ""
             echo "Fake dlopen/dlsym:"
@@ -1464,81 +1554,53 @@ jobs:
             fi
 
             echo ""
+            echo "===== MACRO VERIFICATION ====="
+            echo ""
+
+            if [ -f horizon-research/hotspot-macro-verification-v1.8.txt ]; then
+
+              cat \
+                horizon-research/hotspot-macro-verification-v1.8.txt
+
+            fi
+
+            echo ""
             echo "===== FIRST FAILURE ====="
             echo ""
 
-            if [ -f horizon-research/first-hotspot-failure-v1.7.txt ]; then
+            if [ -f horizon-research/first-hotspot-failure-v1.8.txt ]; then
 
               cat \
-                horizon-research/first-hotspot-failure-v1.7.txt
+                horizon-research/first-hotspot-failure-v1.8.txt
 
             fi
 
             echo ""
-            echo "===== HOTSPOT LAST 1000 ====="
+            echo "===== LAST 1200 ====="
             echo ""
 
-            if [ -f horizon-research/hotspot-build-v1.7.log ]; then
+            if [ -f horizon-research/hotspot-build-v1.8.log ]; then
 
               tail \
-                -n 1000 \
-                horizon-research/hotspot-build-v1.7.log
+                -n 1200 \
+                horizon-research/hotspot-build-v1.8.log
 
             fi
 
-          } > horizon-research/summary-v1.7.txt
+          } > horizon-research/summary-v1.8.txt
 
           echo ""
           echo "========================================"
-          echo " SUMMARY v1.7"
+          echo " SUMMARY v1.8"
           echo "========================================"
           echo ""
 
-          cat horizon-research/summary-v1.7.txt
+          cat \
+            horizon-research/summary-v1.8.txt
 
 
       # ============================================================
-      # 29. Config logs
-      # ============================================================
-
-      - name: Collect OpenJDK config logs
-        shell: bash
-        run: |
-          set +e
-
-          find openjdk21 \
-            -type f \
-            \( \
-              -name 'config.log' \
-              -o \
-              -name 'configure.log' \
-            \) \
-            -print \
-            > horizon-research/config-files.txt
-
-          while IFS= read -r FILEPATH
-          do
-
-            if [ -f "$FILEPATH" ]; then
-
-              SAFE=$(
-                echo "$FILEPATH" \
-                | tr '/' '_'
-              )
-
-              cp \
-                "$FILEPATH" \
-                "horizon-research/$SAFE"
-
-            fi
-
-          done < horizon-research/config-files.txt
-
-          exit 0
-
-
-      # ============================================================
-      # 30. Final report
+      # 31. Final report
       # ============================================================
 
       - name: Final report
@@ -1549,7 +1611,7 @@ jobs:
           echo ""
           echo "========================================"
           echo " Minecraft-NX"
-          echo " OpenJDK Horizon Research v1.7"
+          echo " OpenJDK Horizon Research v1.8"
           echo " Created by Farbert_Took"
           echo "========================================"
 
@@ -1557,16 +1619,17 @@ jobs:
           echo "Configure:"
           cat horizon-research/configure-exit-code.txt
 
+          echo ""
+
           if [ -f horizon-research/hotspot-exit-code.txt ]; then
 
-            echo ""
             echo "HotSpot:"
             cat horizon-research/hotspot-exit-code.txt
 
           fi
 
           echo ""
-          echo "Research files:"
+          echo "Files:"
           echo ""
 
           find \
@@ -1578,22 +1641,16 @@ jobs:
 
           echo ""
           echo "========================================"
-          echo " STATUS v1.7"
+          echo " v1.8 COMPLETE"
           echo "========================================"
-          echo ""
-          echo "dlfcn.h global include:"
-          echo "isolated for Horizon"
-          echo ""
-          echo "No dynamic-loader compatibility layer"
-          echo "has been invented in this workflow."
 
 
       # ============================================================
-      # 31. Artifact
+      # 32. Artifact
       # ============================================================
 
-      - name: Upload Horizon Research v1.7
+      - name: Upload Horizon Research v1.8
         uses: actions/upload-artifact@v4
         with:
-          name: Minecraft-NX-Farbert_Took-OpenJDK-Horizon-v1.7
+          name: Minecraft-NX-Farbert_Took-OpenJDK-Horizon-v1.8
           path: horizon-research
