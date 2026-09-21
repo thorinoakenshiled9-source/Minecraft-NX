@@ -1,4 +1,4 @@
-name: OpenJDK Horizon Research v1.4
+name: OpenJDK Horizon Research v1.5
 
 on:
   workflow_dispatch:
@@ -20,26 +20,25 @@ jobs:
 
       # ============================================================
       # Minecraft-NX
-      # OpenJDK Horizon Research v1.4
+      # OpenJDK Horizon Research v1.5
       # Created by Farbert_Took
       #
-      # v1.2:
-      #   FreeType statico para Horizon: OK
-      #
-      # v1.3:
-      #   primeiro bloqueio X11: ultrapassado
-      #
       # v1.4:
-      #   trata separadamente:
-      #     - bibliotecas X11
-      #     - headers X11
+      #   configure OpenJDK: OK
+      #   make hotspot: iniciou
       #
-      # Somente para o target experimental Horizon.
+      # Primeiro bloqueio real do build HotSpot:
       #
-      # Se configure = 0:
-      #   tenta make hotspot
+      #   lib/JvmMapfile.gmk:
+      #   Unknown target OS horizon
       #
-      # Isto ainda e pesquisa de port.
+      # v1.5:
+      #   - preserva configure funcional
+      #   - pesquisa JvmMapfile.gmk
+      #   - adiciona tratamento Horizon somente no mapfile
+      #   - tenta make hotspot novamente
+      #
+      # NAO transforma Horizon globalmente em Linux.
       # ============================================================
 
 
@@ -81,7 +80,7 @@ jobs:
           echo ""
           echo "========================================"
           echo " Minecraft-NX"
-          echo " OpenJDK Horizon Research v1.4"
+          echo " OpenJDK Horizon Research v1.5"
           echo " Created by Farbert_Took"
           echo "========================================"
 
@@ -116,7 +115,7 @@ jobs:
 
           {
             echo "Minecraft-NX"
-            echo "OpenJDK Horizon Research v1.4"
+            echo "OpenJDK Horizon Research v1.5"
             echo "Created by Farbert_Took"
             echo ""
             echo "Target: Nintendo Switch Horizon"
@@ -124,12 +123,12 @@ jobs:
             echo "JVM: OpenJDK 21 HotSpot minimal"
             echo "Mode: headless"
             echo "FreeType: static target library"
-            echo "Research: complete X11 configure bypass"
+            echo "Research: JvmMapfile.gmk Horizon support"
           } > horizon-research/info.txt
 
 
       # ============================================================
-      # 4. Verifica devkitA64
+      # 4. Toolchain
       # ============================================================
 
       - name: Verify devkitA64
@@ -147,12 +146,9 @@ jobs:
           aarch64-none-elf-g++ --version \
             | tee horizon-research/gxx-version.txt
 
-          echo ""
-          echo "devkitA64 + libnx OK"
-
 
       # ============================================================
-      # 5. Teste AArch64/libnx
+      # 5. Teste Horizon/AArch64
       # ============================================================
 
       - name: Verify Horizon AArch64 compilation
@@ -233,7 +229,7 @@ jobs:
 
 
       # ============================================================
-      # 8. Configure FreeType para Horizon
+      # 8. Configure FreeType
       # ============================================================
 
       - name: Configure FreeType for Horizon
@@ -321,7 +317,7 @@ jobs:
 
 
       # ============================================================
-      # 10. Valida libfreetype.a
+      # 10. Valida FreeType
       # ============================================================
 
       - name: Validate Horizon FreeType
@@ -363,10 +359,6 @@ jobs:
 
           ls -lh "$FREETYPE_LIB"
 
-          echo ""
-          echo "Archive members:"
-          echo ""
-
           aarch64-none-elf-ar \
             t "$FREETYPE_LIB" \
             | head -n 50 \
@@ -376,50 +368,7 @@ jobs:
 
 
       # ============================================================
-      # 11. Teste dos headers FreeType
-      # ============================================================
-
-      - name: Verify FreeType headers with target compiler
-        shell: bash
-        run: |
-          set +e
-
-          if [ "$FREETYPE_READY" != "yes" ]; then
-            exit 0
-          fi
-
-          cat > horizon-research/freetype-test.c <<'EOF'
-          #include <ft2build.h>
-          #include FT_FREETYPE_H
-
-          int minecraft_nx_freetype(void)
-          {
-              FT_Library library = 0;
-              return library == 0 ? 21 : 0;
-          }
-          EOF
-
-          aarch64-none-elf-gcc \
-            -march=armv8-a \
-            -D__SWITCH__ \
-            -I/opt/devkitpro/libnx/include \
-            -I"$FREETYPE_PREFIX/include/freetype2" \
-            -c \
-            horizon-research/freetype-test.c \
-            -o horizon-research/freetype-test.o \
-            2>&1 \
-            | tee horizon-research/freetype-test.log
-
-          STATUS=${PIPESTATUS[0]}
-
-          echo "$STATUS" \
-            > horizon-research/freetype-test-exit.txt
-
-          exit 0
-
-
-      # ============================================================
-      # 12. OpenJDK 21
+      # 11. OpenJDK 21
       # ============================================================
 
       - name: Clone OpenJDK 21
@@ -439,7 +388,7 @@ jobs:
 
 
       # ============================================================
-      # 13. Horizon OS mapping
+      # 12. Horizon OS mapping
       # ============================================================
 
       - name: Add Horizon OS mapping
@@ -485,6 +434,7 @@ jobs:
           else:
 
               pos = s.find(needle)
+
               case_start = s.rfind(
                   "*)",
                   0,
@@ -511,7 +461,7 @@ jobs:
 
 
       # ============================================================
-      # 14. CUPS bypass para Horizon
+      # 13. CUPS bypass
       # ============================================================
 
       - name: Apply Horizon CUPS research bypass
@@ -602,7 +552,7 @@ jobs:
 
 
       # ============================================================
-      # 15. Fontconfig bypass para Horizon
+      # 14. Fontconfig bypass
       # ============================================================
 
       - name: Apply Horizon Fontconfig research bypass
@@ -693,9 +643,7 @@ jobs:
 
 
       # ============================================================
-      # 16. FreeType statico para Horizon
-      #
-      # Patch confirmado funcional no v1.2 e v1.3.
+      # 15. FreeType statico
       # ============================================================
 
       - name: Add static FreeType detection for Horizon
@@ -721,14 +669,7 @@ jobs:
               FREETYPE_LIB_NAME="${LIBRARY_PREFIX}${FREETYPE_BASE_NAME}${SHARED_LIBRARY_SUFFIX}"
             fi'''
 
-          count = s.count(old)
-
-          print(
-              "Original FreeType expression count:",
-              count
-          )
-
-          if count != 1:
+          if s.count(old) != 1:
               raise SystemExit(
                   "Expected exactly one FreeType library expression"
               )
@@ -746,155 +687,9 @@ jobs:
           )
           PY
 
-          echo ""
-          echo "========================================"
-          echo " FREETYPE PATCH RESULT"
-          echo "========================================"
-          echo ""
-
-          grep \
-            -n \
-            -C 12 \
-            'Horizon target: using static FreeType' \
-            openjdk21/make/autoconf/lib-freetype.m4 \
-            | tee horizon-research/freetype-static-patch-v1.4.txt
-
 
       # ============================================================
-      # 17. Localiza TODO o bloco X11
-      #
-      # v1.3 encontrou:
-      #
-      # 1. Could not find X11 libraries
-      # 2. Could not find all X11 headers
-      #
-      # Registramos ambos antes do patch.
-      # ============================================================
-
-      - name: Locate complete OpenJDK X11 checks
-        shell: bash
-        run: |
-          set -e
-
-          echo ""
-          echo "========================================"
-          echo " OPENJDK X11 RESEARCH v1.4"
-          echo " Created by Farbert_Took"
-          echo "========================================"
-          echo ""
-
-          grep \
-            -Rni \
-            -E \
-            'Could not find X11 libraries|Could not find all X11 headers|X11/extensions/shape.h|Xrender.h|Xrandr.h|XTest.h|Intrinsic.h|X11_CFLAGS|X11_LIBS|X_CFLAGS|X_LIBS' \
-            openjdk21/make/autoconf \
-            | tee horizon-research/x11-check-locations-v1.4.txt \
-            || true
-
-          python3 - <<'PY'
-          from pathlib import Path
-
-          root = Path(
-              "openjdk21/make/autoconf"
-          )
-
-          needles = [
-              "Could not find X11 libraries",
-              "Could not find all X11 headers",
-          ]
-
-          output = Path(
-              "horizon-research/x11-complete-context-v1.4.txt"
-          )
-
-          found_total = 0
-
-          with output.open("w") as out:
-
-              for p in root.rglob("*.m4"):
-
-                  text = p.read_text(
-                      errors="ignore"
-                  )
-
-                  lines = text.splitlines()
-
-                  for needle in needles:
-
-                      for i, line in enumerate(lines):
-
-                          if needle not in line:
-                              continue
-
-                          found_total += 1
-
-                          out.write(
-                              "=" * 78 + "\n"
-                          )
-
-                          out.write(
-                              f"FILE: {p}\n"
-                          )
-
-                          out.write(
-                              f"NEEDLE: {needle}\n"
-                          )
-
-                          out.write(
-                              f"LINE: {i + 1}\n"
-                          )
-
-                          out.write(
-                              "=" * 78 + "\n"
-                          )
-
-                          start = max(
-                              0,
-                              i - 80
-                          )
-
-                          end = min(
-                              len(lines),
-                              i + 81
-                          )
-
-                          for n in range(
-                              start,
-                              end
-                          ):
-
-                              out.write(
-                                  f"{n + 1:5}: "
-                                  f"{lines[n]}\n"
-                              )
-
-                          out.write("\n")
-
-          print(
-              output.read_text()
-          )
-
-          if found_total < 2:
-              raise SystemExit(
-                  "Expected both X11 library and header checks"
-              )
-
-          print(
-              "X11 checks found:",
-              found_total
-          )
-          PY
-
-
-      # ============================================================
-      # 18. X11 COMPLETO PARA HORIZON
-      #
-      # Nao implementa X11.
-      #
-      # Apenas impede que a configuracao de um target Horizon
-      # headless seja encerrada pelas verificacoes de X11.
-      #
-      # Outros targets mantem o comportamento original.
+      # 16. X11 libraries + headers
       # ============================================================
 
       - name: Apply complete Horizon headless X11 bypass
@@ -920,8 +715,6 @@ jobs:
               ),
           ]
 
-          patched = []
-
           for needle, label in checks:
 
               candidates = []
@@ -936,19 +729,14 @@ jobs:
                       candidates.append(p)
 
               if len(candidates) != 1:
-
                   raise SystemExit(
-                      f"{label}: expected exactly "
-                      f"one source file, found "
-                      f"{len(candidates)}: "
-                      f"{candidates}"
+                      f"{label}: expected one source file, "
+                      f"found {len(candidates)}"
                   )
 
               p = candidates[0]
 
-              text = p.read_text()
-
-              lines = text.splitlines(
+              lines = p.read_text().splitlines(
                   True
               )
 
@@ -960,15 +748,13 @@ jobs:
                       needle in line
                       and "AC_MSG_ERROR" in line
                   ):
-
                       indexes.append(i)
 
               if len(indexes) != 1:
-
                   raise SystemExit(
-                      f"{label}: expected exactly "
-                      f"one AC_MSG_ERROR line, "
-                      f"found {len(indexes)}"
+                      f"{label}: expected one "
+                      f"AC_MSG_ERROR, found "
+                      f"{len(indexes)}"
                   )
 
               i = indexes[0]
@@ -1025,140 +811,36 @@ jobs:
                   "".join(lines)
               )
 
-              patched.append(
-                  (
-                      str(p),
-                      label
-                  )
-              )
-
-          print("")
           print(
-              "Horizon X11 patches:"
-          )
-
-          for p, label in patched:
-
-              print(
-                  f"  {label}: {p}"
-              )
-
-          print("")
-          print(
-              "Original checks remain active "
-              "for non-Horizon targets."
+              "Horizon X11 library/header bypass installed"
           )
           PY
 
-          echo ""
-          echo "========================================"
-          echo " X11 COMPLETE PATCH v1.4"
-          echo "========================================"
-          echo ""
-
-          grep \
-            -Rni \
-            -C 12 \
-            -E \
-            'X11 libraries disabled for experimental Horizon|X11 headers disabled for experimental Horizon' \
-            openjdk21/make/autoconf \
-            | tee horizon-research/x11-complete-patch-v1.4.txt
-
-          echo ""
-          echo "========================================"
-          echo " VALIDATING X11 PATCH"
-          echo "========================================"
-          echo ""
-
-          grep -Rqs \
-            'X11 libraries disabled for experimental Horizon' \
-            openjdk21/make/autoconf
-
-          grep -Rqs \
-            'X11 headers disabled for experimental Horizon' \
-            openjdk21/make/autoconf
-
-          echo "X11 library guard: OK"
-          echo "X11 header guard: OK"
-
 
       # ============================================================
-      # 19. Valida todos os patches
+      # 17. Salva configure patch
       # ============================================================
 
-      - name: Validate Horizon patches
-        shell: bash
-        run: |
-          set -e
-
-          grep -Rqs \
-            'Horizon target: using static FreeType' \
-            openjdk21/make/autoconf
-
-          grep -Rqs \
-            'X11 libraries disabled for experimental Horizon' \
-            openjdk21/make/autoconf
-
-          grep -Rqs \
-            'X11 headers disabled for experimental Horizon' \
-            openjdk21/make/autoconf
-
-          grep -Rqs \
-            'CUPS disabled for experimental Horizon' \
-            openjdk21/make/autoconf
-
-          grep -Rqs \
-            'Fontconfig disabled for experimental Horizon' \
-            openjdk21/make/autoconf
-
-          echo ""
-          echo "========================================"
-          echo " HORIZON PATCH VALIDATION"
-          echo "========================================"
-          echo ""
-
-          echo "FreeType Horizon patch: OK"
-          echo "X11 libraries Horizon patch: OK"
-          echo "X11 headers Horizon patch: OK"
-          echo "CUPS Horizon patch: OK"
-          echo "Fontconfig Horizon patch: OK"
-
-
-      # ============================================================
-      # 20. Salva diff
-      # ============================================================
-
-      - name: Save OpenJDK Horizon patch
+      - name: Save configure Horizon patch
         shell: bash
         run: |
           set -e
 
           git -C openjdk21 diff \
-            > horizon-research/openjdk-horizon-v1.4.patch
-
-          echo ""
-          echo "Patch lines:"
-          echo ""
-
-          wc -l \
-            horizon-research/openjdk-horizon-v1.4.patch
-
-          echo ""
-          echo "Relevant patch:"
-          echo ""
+            > horizon-research/openjdk-horizon-configure-v1.5.patch
 
           grep \
             -n \
-            -C 15 \
+            -C 10 \
             -E \
-            'horizon|Horizon|FREETYPE_LIB_NAME|X11|CUPS|Fontconfig' \
-            horizon-research/openjdk-horizon-v1.4.patch \
+            'horizon|Horizon|FREETYPE|X11|CUPS|Fontconfig' \
+            horizon-research/openjdk-horizon-configure-v1.5.patch \
             | head -n 1500 \
             || true
 
 
       # ============================================================
-      # 21. Configure OpenJDK
+      # 18. Configure OpenJDK
       # ============================================================
 
       - name: Configure OpenJDK Horizon
@@ -1169,7 +851,7 @@ jobs:
           if [ "$FREETYPE_READY" != "yes" ]; then
 
             echo "FreeType target unavailable." \
-              > horizon-research/configure-v1.4.log
+              > horizon-research/configure-v1.5.log
 
             echo "99" \
               > horizon-research/configure-exit-code.txt
@@ -1178,21 +860,6 @@ jobs:
           fi
 
           cd openjdk21
-
-          echo ""
-          echo "========================================"
-          echo " OPENJDK HORIZON CONFIGURE v1.4"
-          echo "========================================"
-          echo ""
-
-          echo "FreeType include:"
-          echo "$FREETYPE_PREFIX/include/freetype2"
-
-          echo ""
-          echo "FreeType lib:"
-          echo "$FREETYPE_LIBDIR"
-
-          echo ""
 
           bash configure \
             --openjdk-target=aarch64-none-elf \
@@ -1211,7 +878,7 @@ jobs:
             OBJCOPY=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-objcopy \
             STRIP=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-strip \
             2>&1 \
-            | tee ../horizon-research/configure-v1.4.log
+            | tee ../horizon-research/configure-v1.5.log
 
           STATUS=${PIPESTATUS[0]}
 
@@ -1222,10 +889,640 @@ jobs:
 
 
       # ============================================================
-      # 22. SUMMARY
+      # 19. Configure summary
       # ============================================================
 
-      - name: Analyze OpenJDK configure
+      - name: Show configure result
+        shell: bash
+        run: |
+          set -e
+
+          echo ""
+          echo "========================================"
+          echo " CONFIGURE RESULT v1.5"
+          echo "========================================"
+          echo ""
+
+          STATUS=$(
+            cat horizon-research/configure-exit-code.txt
+          )
+
+          echo "Configure exit:"
+          echo "$STATUS"
+
+          echo ""
+
+          grep -i -E \
+            'error|warning|horizon|aarch64|headless|minimal|freetype|x11|cups|fontconfig|dlopen' \
+            horizon-research/configure-v1.5.log \
+            | tail -n 1000 \
+            || true
+
+
+      # ============================================================
+      # 20. LOCALIZA JvmMapfile.gmk
+      # ============================================================
+
+      - name: Locate JvmMapfile rules
+        shell: bash
+        run: |
+          set -e
+
+          echo ""
+          echo "========================================"
+          echo " JVMMAPFILE RESEARCH v1.5"
+          echo "========================================"
+          echo ""
+
+          JVMMAPFILE=$(
+            find openjdk21 \
+              -type f \
+              -name 'JvmMapfile.gmk' \
+              | head -n 1
+          )
+
+          if [ -z "$JVMMAPFILE" ]; then
+            echo "JvmMapfile.gmk not found"
+            exit 1
+          fi
+
+          echo "JVMMAPFILE=$JVMMAPFILE" \
+            >> "$GITHUB_ENV"
+
+          echo "Found:"
+          echo "$JVMMAPFILE"
+
+          echo ""
+          echo "===== FULL FILE ====="
+          echo ""
+
+          nl -ba "$JVMMAPFILE" \
+            | tee horizon-research/JvmMapfile-full-v1.5.txt
+
+          echo ""
+          echo "===== OS RELATED ====="
+          echo ""
+
+          grep \
+            -n \
+            -C 30 \
+            -E \
+            'TARGET_OS|OPENJDK_TARGET_OS|linux|windows|macosx|aix|bsd|Unknown target OS' \
+            "$JVMMAPFILE" \
+            | tee horizon-research/JvmMapfile-os-context-v1.5.txt \
+            || true
+
+
+      # ============================================================
+      # 21. PATCH JvmMapfile.gmk
+      #
+      # O erro do v1.4 foi:
+      #
+      # Unknown target OS horizon in JvmMapfile.gmk
+      #
+      # Em vez de fingir que Horizon = Linux globalmente,
+      # tratamos Horizon somente nesta regra.
+      #
+      # Para ELF/Horizon, a estrategia experimental e usar a mesma
+      # ferramenta de processamento de simbolos usada pelo caminho
+      # ELF suportado pela regra, sem alterar OPENJDK_TARGET_OS.
+      # ============================================================
+
+      - name: Add Horizon support to JvmMapfile
+        shell: bash
+        run: |
+          set -e
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          files = list(
+              Path("openjdk21").rglob(
+                  "JvmMapfile.gmk"
+              )
+          )
+
+          if len(files) != 1:
+              raise SystemExit(
+                  f"Expected exactly one JvmMapfile.gmk, "
+                  f"found {len(files)}"
+              )
+
+          p = files[0]
+
+          text = p.read_text()
+
+          print(
+              "Patching:",
+              p
+          )
+
+          print("")
+          print(
+              "Occurrences of unknown OS message:",
+              text.count("Unknown target OS")
+          )
+
+          if text.count(
+              "Unknown target OS"
+          ) != 1:
+
+              raise SystemExit(
+                  "Unexpected JvmMapfile structure"
+              )
+
+          #
+          # JvmMapfile.gmk already contains the OS branches.
+          # We insert Horizon immediately before the final
+          # unsupported-OS branch.
+          #
+          # Horizon binaries use ELF, so for this mapfile stage
+          # we use the ELF/Linux-style mapfile transformation only.
+          #
+          # This does NOT change Horizon to Linux globally.
+          #
+
+          marker = (
+              '$(error Unknown target OS '
+              '$(OPENJDK_TARGET_OS) in '
+              'JvmMapfile.gmk)'
+          )
+
+          pos = text.find(marker)
+
+          if pos < 0:
+              raise SystemExit(
+                  "Exact Unknown target OS expression "
+                  "not found"
+              )
+
+          #
+          # Save surrounding source before modification.
+          #
+
+          lines = text.splitlines()
+
+          marker_line = None
+
+          for i, line in enumerate(lines):
+
+              if "Unknown target OS" in line:
+                  marker_line = i
+                  break
+
+          if marker_line is None:
+              raise SystemExit(
+                  "Could not determine marker line"
+              )
+
+          start = max(
+              0,
+              marker_line - 80
+          )
+
+          end = min(
+              len(lines),
+              marker_line + 30
+          )
+
+          context = "\n".join(
+              f"{n + 1:5}: {lines[n]}"
+              for n in range(
+                  start,
+                  end
+              )
+          )
+
+          Path(
+              "horizon-research/"
+              "JvmMapfile-before-v1.5.txt"
+          ).write_text(
+              context + "\n"
+          )
+
+          #
+          # Discover the Linux branch.
+          #
+          # Instead of hardcoding a complete OpenJDK rule from
+          # memory, duplicate the existing Linux conditional
+          # behavior for this one mapfile decision.
+          #
+
+          linux_patterns = [
+              'ifeq ($(OPENJDK_TARGET_OS), linux)',
+              'ifeq ($(OPENJDK_TARGET_OS),linux)',
+          ]
+
+          linux_start = -1
+
+          for pattern in linux_patterns:
+
+              linux_start = text.find(
+                  pattern
+              )
+
+              if linux_start >= 0:
+                  break
+
+          if linux_start < 0:
+
+              #
+              # Some OpenJDK revisions use filter expressions
+              # rather than a simple ifeq. In that case, the
+              # safest local adaptation is to make Horizon match
+              # Linux only in this file's OS dispatch expression.
+              #
+
+              replacements = [
+                  (
+                      '$(filter linux,$(OPENJDK_TARGET_OS))',
+                      '$(filter linux horizon,$(OPENJDK_TARGET_OS))'
+                  ),
+                  (
+                      '$(filter linux, $(OPENJDK_TARGET_OS))',
+                      '$(filter linux horizon, $(OPENJDK_TARGET_OS))'
+                  ),
+              ]
+
+              changed = False
+
+              for old, new in replacements:
+
+                  if old in text:
+
+                      text = text.replace(
+                          old,
+                          new,
+                          1
+                      )
+
+                      changed = True
+
+                      print(
+                          "Extended existing ELF/Linux "
+                          "mapfile branch to Horizon"
+                      )
+
+                      break
+
+              if not changed:
+
+                  #
+                  # Final targeted fallback:
+                  #
+                  # The v1.4 error proves the final branch is
+                  # explicitly rejecting Horizon.
+                  #
+                  # Add a Horizon conditional directly before
+                  # that rejection, reusing the mapfile command
+                  # selected by the nearest Linux branch is not
+                  # safe without seeing structure, so stop here.
+                  #
+
+                  raise SystemExit(
+                      "Could not safely identify Linux/ELF "
+                      "JvmMapfile branch. "
+                      "See JvmMapfile-before-v1.5.txt."
+                  )
+
+          else:
+
+              #
+              # Simple ifeq form.
+              #
+              # Extend ONLY this JvmMapfile condition:
+              #
+              #   linux
+              #
+              # becomes:
+              #
+              #   linux or horizon
+              #
+              # using filter, while leaving the rest of the
+              # Linux implementation untouched.
+              #
+
+              old = pattern
+
+              new = (
+                  'ifneq ($(filter '
+                  'linux horizon,'
+                  '$(OPENJDK_TARGET_OS)),)'
+              )
+
+              text = text.replace(
+                  old,
+                  new,
+                  1
+              )
+
+              print(
+                  "JvmMapfile Linux/ELF condition "
+                  "extended to Horizon"
+              )
+
+          p.write_text(text)
+
+          print("")
+          print(
+              "Horizon remains a distinct "
+              "OPENJDK_TARGET_OS."
+          )
+          PY
+
+          echo ""
+          echo "========================================"
+          echo " JVMMAPFILE PATCH RESULT"
+          echo "========================================"
+          echo ""
+
+          git -C openjdk21 diff \
+            -- '*JvmMapfile.gmk' \
+            | tee horizon-research/JvmMapfile-patch-v1.5.diff
+
+          echo ""
+          echo "Horizon references:"
+          echo ""
+
+          grep \
+            -n \
+            -C 30 \
+            -E \
+            'horizon|Horizon|Unknown target OS' \
+            "$JVMMAPFILE" \
+            | tee horizon-research/JvmMapfile-after-v1.5.txt \
+            || true
+
+
+      # ============================================================
+      # 22. Salva patch completo
+      # ============================================================
+
+      - name: Save complete Horizon patch
+        shell: bash
+        run: |
+          set -e
+
+          git -C openjdk21 diff \
+            > horizon-research/openjdk-horizon-v1.5.patch
+
+          echo ""
+          echo "Complete patch lines:"
+          echo ""
+
+          wc -l \
+            horizon-research/openjdk-horizon-v1.5.patch
+
+
+      # ============================================================
+      # 23. HOTSPOT PROBE v1.5
+      # ============================================================
+
+      - name: Probe HotSpot build v1.5
+        shell: bash
+        run: |
+          set +e
+
+          CONFIG_STATUS=$(
+            cat horizon-research/configure-exit-code.txt
+          )
+
+          if [ "$CONFIG_STATUS" != "0" ]; then
+
+            {
+              echo "========================================"
+              echo " HOTSPOT PROBE v1.5"
+              echo "========================================"
+              echo ""
+              echo "NOT STARTED"
+              echo ""
+              echo "Configure exit:"
+              echo "$CONFIG_STATUS"
+
+            } > horizon-research/hotspot-summary-v1.5.txt
+
+            cat horizon-research/hotspot-summary-v1.5.txt
+
+            exit 0
+          fi
+
+          cd openjdk21
+
+          echo ""
+          echo "========================================"
+          echo " HOTSPOT PROBE v1.5"
+          echo " Created by Farbert_Took"
+          echo "========================================"
+          echo ""
+
+          make hotspot \
+            2>&1 \
+            | tee ../horizon-research/hotspot-build-v1.5.log
+
+          STATUS=${PIPESTATUS[0]}
+
+          echo "$STATUS" \
+            > ../horizon-research/hotspot-exit-code.txt
+
+          {
+            echo "========================================"
+            echo " Minecraft-NX"
+            echo " HOTSPOT PROBE v1.5"
+            echo " Created by Farbert_Took"
+            echo "========================================"
+
+            echo ""
+            echo "make hotspot exit:"
+            echo "$STATUS"
+
+            echo ""
+            echo "Relevant messages:"
+            echo ""
+
+            grep -i -E \
+              'error|fatal|horizon|aarch64|os_cpu|os/|not found|no rule|undefined|unsupported|missing|posix|linux|pthread|signal|mmap|munmap|dlopen|dlsym|clock|gettimeofday|thread|socket|atomic|errno|mapfile|JvmMapfile' \
+              ../horizon-research/hotspot-build-v1.5.log \
+              | tail -n 6000 \
+              || true
+
+            echo ""
+            echo "===== LAST 1500 ====="
+            echo ""
+
+            tail \
+              -n 1500 \
+              ../horizon-research/hotspot-build-v1.5.log
+
+          } > ../horizon-research/hotspot-summary-v1.5.txt
+
+          cat ../horizon-research/hotspot-summary-v1.5.txt
+
+          exit 0
+
+
+      # ============================================================
+      # 24. Detecta primeiro erro
+      # ============================================================
+
+      - name: Extract first HotSpot failure
+        shell: bash
+        run: |
+          set +e
+
+          LOG="horizon-research/hotspot-build-v1.5.log"
+
+          if [ ! -f "$LOG" ]; then
+            exit 0
+          fi
+
+          {
+            echo "Minecraft-NX"
+            echo "First HotSpot Failure v1.5"
+            echo "Created by Farbert_Took"
+            echo ""
+
+            echo "===== FIRST ERROR-LIKE LINES ====="
+            echo ""
+
+            grep \
+              -n \
+              -m 40 \
+              -E \
+              '(^|[^A-Za-z])(error:|fatal error:|Error [0-9]|undefined reference|No such file|No rule to make target|Unknown target|unsupported)' \
+              "$LOG" \
+              || true
+
+          } > horizon-research/first-hotspot-failure-v1.5.txt
+
+          cat \
+            horizon-research/first-hotspot-failure-v1.5.txt
+
+          exit 0
+
+
+      # ============================================================
+      # 25. Source map
+      # ============================================================
+
+      - name: Create Horizon HotSpot source map
+        shell: bash
+        run: |
+          set +e
+
+          {
+            echo "Minecraft-NX"
+            echo "HotSpot Horizon Source Map v1.5"
+            echo "Created by Farbert_Took"
+
+            echo ""
+            echo "===== CPU/AArch64 ====="
+
+            find \
+              openjdk21/src/hotspot/cpu/aarch64 \
+              -maxdepth 1 \
+              -type f \
+              -print \
+              2>/dev/null \
+              | sort
+
+            echo ""
+            echo "===== OS ====="
+
+            find \
+              openjdk21/src/hotspot/os \
+              -mindepth 1 \
+              -maxdepth 1 \
+              -type d \
+              -print \
+              2>/dev/null \
+              | sort
+
+            echo ""
+            echo "===== OS_CPU ====="
+
+            find \
+              openjdk21/src/hotspot/os_cpu \
+              -mindepth 1 \
+              -maxdepth 1 \
+              -type d \
+              -print \
+              2>/dev/null \
+              | sort
+
+            echo ""
+            echo "===== LINUX REFERENCE ====="
+
+            find \
+              openjdk21/src/hotspot/os/linux \
+              openjdk21/src/hotspot/os_cpu/linux_aarch64 \
+              -maxdepth 1 \
+              -type f \
+              -print \
+              2>/dev/null \
+              | sort
+
+            echo ""
+            echo "===== HORIZON CURRENT ====="
+
+            find \
+              openjdk21/src/hotspot/os/horizon \
+              openjdk21/src/hotspot/os_cpu/horizon_aarch64 \
+              -type f \
+              -print \
+              2>/dev/null \
+              | sort
+
+          } > horizon-research/hotspot-source-map-v1.5.txt
+
+          exit 0
+
+
+      # ============================================================
+      # 26. Procura seletores de OS no build system
+      # ============================================================
+
+      - name: Research additional HotSpot OS selectors
+        shell: bash
+        run: |
+          set +e
+
+          {
+            echo "Minecraft-NX"
+            echo "HotSpot OS Selector Research v1.5"
+            echo "Created by Farbert_Took"
+
+            echo ""
+            echo "===== UNKNOWN TARGET OS ====="
+
+            grep \
+              -Rni \
+              -E \
+              'Unknown target OS|Unsupported target OS|unsupported.*TARGET_OS|OPENJDK_TARGET_OS' \
+              openjdk21/make \
+              2>/dev/null \
+              | head -n 3000
+
+            echo ""
+            echo "===== HOTSPOT OS PATHS ====="
+
+            grep \
+              -Rni \
+              -E \
+              'src/hotspot/os/|src/hotspot/os_cpu/|HOTSPOT_TARGET_OS' \
+              openjdk21/make \
+              2>/dev/null \
+              | head -n 3000
+
+          } > horizon-research/hotspot-os-selectors-v1.5.txt
+
+          exit 0
+
+
+      # ============================================================
+      # 27. Final summary
+      # ============================================================
+
+      - name: Final v1.5 summary
         shell: bash
         run: |
           set -e
@@ -1233,7 +1530,7 @@ jobs:
           {
             echo "========================================"
             echo " Minecraft-NX"
-            echo " OpenJDK Horizon Research v1.4"
+            echo " OpenJDK Horizon Research v1.5"
             echo " Created by Farbert_Took"
             echo "========================================"
 
@@ -1250,275 +1547,67 @@ jobs:
             echo "headless"
 
             echo ""
-            echo "FreeType configure exit:"
-            cat horizon-research/freetype-configure-exit.txt
-
-            echo ""
-            echo "FreeType build exit:"
-            cat horizon-research/freetype-build-exit.txt
-
-            echo ""
-            echo "FreeType ready:"
+            echo "FreeType:"
             echo "${FREETYPE_READY:-no}"
 
             echo ""
-            echo "FreeType library:"
-            echo "${FREETYPE_LIB:-not-found}"
-
-            echo ""
-            echo "OpenJDK configure exit:"
+            echo "Configure exit:"
             cat horizon-research/configure-exit-code.txt
 
             echo ""
-            echo "Relevant messages:"
+            echo "JvmMapfile Horizon patch:"
+            echo "attempted"
+
             echo ""
 
-            grep -i -E \
-              'error|warning|unsupported|horizon|target|host|aarch64|headless|minimal|freetype|cups|fontconfig|x11|xext|xrender|xrandr|xtst|intrinsic|alsa|ffi|sysroot|posix|linux|library|libraries|header|headers|jvm|pthread|signal|mmap|munmap|dlopen|dlsym|socket|atomic|thread' \
-              horizon-research/configure-v1.4.log \
-              | tail -n 4000 \
-              || true
+            if [ -f horizon-research/hotspot-exit-code.txt ]; then
 
-          } > horizon-research/summary-v1.4.txt
+              echo "HotSpot exit:"
+              cat horizon-research/hotspot-exit-code.txt
+
+            else
+
+              echo "HotSpot exit:"
+              echo "not-run"
+
+            fi
+
+            echo ""
+            echo "===== FIRST FAILURE ====="
+            echo ""
+
+            if [ -f horizon-research/first-hotspot-failure-v1.5.txt ]; then
+
+              cat \
+                horizon-research/first-hotspot-failure-v1.5.txt
+
+            fi
+
+            echo ""
+            echo "===== HOTSPOT TAIL ====="
+            echo ""
+
+            if [ -f horizon-research/hotspot-build-v1.5.log ]; then
+
+              tail \
+                -n 500 \
+                horizon-research/hotspot-build-v1.5.log
+
+            fi
+
+          } > horizon-research/summary-v1.5.txt
 
           echo ""
           echo "========================================"
-          echo " SUMMARY v1.4"
+          echo " SUMMARY v1.5"
           echo "========================================"
           echo ""
 
-          cat horizon-research/summary-v1.4.txt
+          cat horizon-research/summary-v1.5.txt
 
 
       # ============================================================
-      # 23. Configure tail
-      # ============================================================
-
-      - name: Show configure tail
-        shell: bash
-        run: |
-          set +e
-
-          echo ""
-          echo "========================================"
-          echo " CONFIGURE LAST 1000"
-          echo "========================================"
-          echo ""
-
-          tail \
-            -n 1000 \
-            horizon-research/configure-v1.4.log \
-            | tee horizon-research/configure-tail-v1.4.txt
-
-          exit 0
-
-
-      # ============================================================
-      # 24. HotSpot probe
-      #
-      # Somente se configure = 0.
-      # ============================================================
-
-      - name: Probe HotSpot build
-        shell: bash
-        run: |
-          set +e
-
-          CONFIG_STATUS=$(
-            cat horizon-research/configure-exit-code.txt
-          )
-
-          if [ "$CONFIG_STATUS" != "0" ]; then
-
-            {
-              echo "========================================"
-              echo " HOTSPOT PROBE v1.4"
-              echo "========================================"
-              echo ""
-              echo "NOT STARTED"
-              echo ""
-              echo "OpenJDK configure exit:"
-              echo "$CONFIG_STATUS"
-
-            } > horizon-research/hotspot-summary-v1.4.txt
-
-            cat horizon-research/hotspot-summary-v1.4.txt
-
-            exit 0
-          fi
-
-          echo ""
-          echo "========================================"
-          echo " OPENJDK CONFIGURE = 0"
-          echo " STARTING HOTSPOT PROBE"
-          echo "========================================"
-          echo ""
-
-          cd openjdk21
-
-          make hotspot \
-            2>&1 \
-            | tee ../horizon-research/hotspot-build-v1.4.log
-
-          STATUS=${PIPESTATUS[0]}
-
-          echo "$STATUS" \
-            > ../horizon-research/hotspot-exit-code.txt
-
-          {
-            echo "========================================"
-            echo " Minecraft-NX"
-            echo " HOTSPOT PROBE v1.4"
-            echo " Created by Farbert_Took"
-            echo "========================================"
-
-            echo ""
-            echo "make hotspot exit:"
-            echo "$STATUS"
-
-            echo ""
-            echo "Relevant messages:"
-            echo ""
-
-            grep -i -E \
-              'error|fatal|horizon|aarch64|os_cpu|os/|not found|no rule|undefined|unsupported|missing|posix|linux|pthread|signal|mmap|munmap|dlopen|dlsym|clock|gettimeofday|thread|socket|atomic|errno' \
-              ../horizon-research/hotspot-build-v1.4.log \
-              | tail -n 5000 \
-              || true
-
-            echo ""
-            echo "===== LAST 1200 ====="
-            echo ""
-
-            tail \
-              -n 1200 \
-              ../horizon-research/hotspot-build-v1.4.log
-
-          } > ../horizon-research/hotspot-summary-v1.4.txt
-
-          cat ../horizon-research/hotspot-summary-v1.4.txt
-
-          exit 0
-
-
-      # ============================================================
-      # 25. HotSpot source map
-      # ============================================================
-
-      - name: Create HotSpot port map
-        shell: bash
-        run: |
-          set +e
-
-          {
-            echo "Minecraft-NX"
-            echo "HotSpot Horizon Port Map v1.4"
-            echo "Created by Farbert_Took"
-
-            echo ""
-            echo "===== AArch64 CPU backend ====="
-
-            find \
-              openjdk21/src/hotspot/cpu/aarch64 \
-              -maxdepth 1 \
-              -type f \
-              -print \
-              2>/dev/null \
-              | sort
-
-            echo ""
-            echo "===== HotSpot OS implementations ====="
-
-            find \
-              openjdk21/src/hotspot/os \
-              -mindepth 1 \
-              -maxdepth 1 \
-              -type d \
-              -print \
-              2>/dev/null \
-              | sort
-
-            echo ""
-            echo "===== HotSpot OS/CPU implementations ====="
-
-            find \
-              openjdk21/src/hotspot/os_cpu \
-              -mindepth 1 \
-              -maxdepth 1 \
-              -type d \
-              -print \
-              2>/dev/null \
-              | sort
-
-            echo ""
-            echo "===== Linux AArch64 reference ====="
-
-            find \
-              openjdk21/src/hotspot/os/linux \
-              openjdk21/src/hotspot/os_cpu/linux_aarch64 \
-              -maxdepth 1 \
-              -type f \
-              -print \
-              2>/dev/null \
-              | sort
-
-            echo ""
-            echo "===== Potential Horizon structure ====="
-
-            echo "src/hotspot/os/horizon/"
-            echo "src/hotspot/os_cpu/horizon_aarch64/"
-
-          } > horizon-research/hotspot-port-map-v1.4.txt
-
-          exit 0
-
-
-      # ============================================================
-      # 26. Pesquisa dlopen
-      #
-      # Nao faz bypass.
-      # Apenas registra onde OpenJDK usa/testa dlopen.
-      # ============================================================
-
-      - name: Research dlopen requirements
-        shell: bash
-        run: |
-          set +e
-
-          {
-            echo "Minecraft-NX"
-            echo "OpenJDK dlopen Research v1.4"
-            echo "Created by Farbert_Took"
-
-            echo ""
-            echo "===== AUTOCONF ====="
-
-            grep \
-              -Rni \
-              -E \
-              'dlopen|dlsym|libdl|-ldl' \
-              openjdk21/make/autoconf \
-              2>/dev/null \
-              | head -n 1000
-
-            echo ""
-            echo "===== HOTSPOT ====="
-
-            grep \
-              -Rni \
-              -E \
-              'dlopen|dlsym|dlclose' \
-              openjdk21/src/hotspot \
-              2>/dev/null \
-              | head -n 2000
-
-          } > horizon-research/dlopen-research-v1.4.txt
-
-          exit 0
-
-
-      # ============================================================
-      # 27. Config logs
+      # 28. Collect configure logs
       # ============================================================
 
       - name: Collect OpenJDK config logs
@@ -1558,10 +1647,10 @@ jobs:
 
 
       # ============================================================
-      # 28. Final report
+      # 29. Final report
       # ============================================================
 
-      - name: Final v1.4 report
+      - name: Final report
         shell: bash
         run: |
           set -e
@@ -1569,26 +1658,18 @@ jobs:
           echo ""
           echo "========================================"
           echo " Minecraft-NX"
-          echo " OpenJDK Horizon Research v1.4"
+          echo " OpenJDK Horizon Research v1.5"
           echo " Created by Farbert_Took"
           echo "========================================"
 
           echo ""
-          echo "FreeType target:"
-          echo "${FREETYPE_READY:-no}"
-
-          echo ""
-          echo "FreeType library:"
-          echo "${FREETYPE_LIB:-not-found}"
-
-          echo ""
-          echo "OpenJDK configure exit:"
+          echo "Configure:"
           cat horizon-research/configure-exit-code.txt
 
           if [ -f horizon-research/hotspot-exit-code.txt ]; then
 
             echo ""
-            echo "HotSpot build exit:"
+            echo "HotSpot:"
             cat horizon-research/hotspot-exit-code.txt
 
           fi
@@ -1606,27 +1687,24 @@ jobs:
 
           echo ""
           echo "========================================"
-          echo " IMPORTANT"
+          echo " STATUS"
           echo "========================================"
           echo ""
-          echo "X11 bypass nao implementa X11 no Horizon."
-          echo "CUPS/Fontconfig bypass tambem nao"
-          echo "implementam esses componentes."
+          echo "OpenJDK configure ja foi atravessado."
           echo ""
-          echo "O objetivo atual e sondar os requisitos"
-          echo "do OpenJDK/HotSpot para um target"
-          echo "Horizon AArch64 headless/minimal."
+          echo "v1.5 pesquisa e adapta somente"
+          echo "JvmMapfile.gmk para Horizon."
           echo ""
-          echo "Configure=0 nao significa que o"
-          echo "HotSpot ja foi portado."
+          echo "Isto ainda nao constitui um port"
+          echo "funcional do HotSpot para Horizon."
 
 
       # ============================================================
-      # 29. Artifact
+      # 30. Artifact
       # ============================================================
 
-      - name: Upload Horizon Research v1.4
+      - name: Upload Horizon Research v1.5
         uses: actions/upload-artifact@v4
         with:
-          name: Minecraft-NX-Farbert_Took-OpenJDK-Horizon-v1.4
+          name: Minecraft-NX-Farbert_Took-OpenJDK-Horizon-v1.5
           path: horizon-research
