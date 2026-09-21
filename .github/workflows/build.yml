@@ -1,4 +1,4 @@
-name: Build Minecraft-NX Java HID Test
+name: Build Minecraft-NX Java Capability Test
 
 on:
   push:
@@ -26,7 +26,7 @@ jobs:
           name: Minecraft-NX-nro
           path: Minecraft-NX.nro
 
-  java-hid-test:
+  java-capability-test:
     runs-on: ubuntu-latest
 
     container:
@@ -36,18 +36,26 @@ jobs:
       - name: Install tools
         run: |
           apt-get update
-          apt-get install -y git python3 maven
+          apt-get install -y git python3 maven default-jdk
 
       - name: Clone JavaVM
         run: |
           git clone --recursive https://github.com/XorTroll/javm-nx-poc.git
+
+      # ------------------------------------------------------------
+      # Compatibilidade do javm-nx-poc com toolchains C++ atuais
+      # ------------------------------------------------------------
 
       - name: Patch algorithm compatibility
         shell: bash
         run: |
           python3 -c 'from pathlib import Path; files=[Path("javm-nx-poc/libjavm/libjavm/include/javm/core/core_ClassObject.hpp"),Path("javm-nx-poc/libjavm/libjavm/include/javm/core/core_ManifestFile.hpp")]; [(p.write_text(("#include <algorithm>\n" if "#include <algorithm>" not in p.read_text() else "")+p.read_text())) for p in files]'
 
-      - name: Create modern HID Input
+      # ------------------------------------------------------------
+      # Porta nx.hid.Input da API HID antiga para PadState
+      # ------------------------------------------------------------
+
+      - name: Port HID to modern libnx
         shell: bash
         run: |
           python3 -c 'from pathlib import Path; p=Path("javm-nx-poc/nx/native/nx/hid/Input.class.hpp"); s="""#pragma once
@@ -66,6 +74,7 @@ jobs:
 
                       static void EnsureInitialized() {
                           if(!initialized) {
+
                               padConfigureInput(
                                   1,
                                   HidNpadStyleSet_NpadStandard
@@ -181,26 +190,145 @@ jobs:
       - name: Verify HID registration
         shell: bash
         run: |
-          echo "=== Input.class.hpp ==="
-          cat javm-nx-poc/nx/native/nx/hid/Input.class.hpp
-
-          echo ""
-          echo "=== nx_Java.hpp ==="
-          cat javm-nx-poc/nx/native/nx_Java.hpp
-
           grep -q "Input.class.hpp" \
             javm-nx-poc/nx/native/nx_Java.hpp
 
           grep -q "LoadNativeClass<hid::Input>" \
             javm-nx-poc/nx/native/nx_Java.hpp
 
-          echo ""
-          echo "HID Input continua registrado"
+          echo "nx.hid.Input registrado"
 
-      - name: Patch direct JAR launch
+      # ------------------------------------------------------------
+      # Cria nosso programa de teste Java
+      # ------------------------------------------------------------
+
+      - name: Create capability test
         shell: bash
         run: |
-          python3 -c 'from pathlib import Path; p=Path("javm-nx-poc/javm/source/Main.cpp"); s=p.read_text(); marker="int main(int argc, char **argv)"; marker2="int main(int argc, char *argv[])"; marker=marker if marker in s else marker2; assert marker in s, "main nao encontrado"; start=s.index(marker); brace=s.index("{", start)+1; patch="\n    static char direct_app[] = \"javm.nro\";\n    static char direct_jar[] = \"sdmc:/switch/java-hello-world.jar\";\n    static char *direct_argv[] = { direct_app, direct_jar, nullptr };\n    argc = 2;\n    argv = direct_argv;\n"; p.write_text(s[:brace]+patch+s[brace:]); print(p.read_text())'
+          mkdir -p capability/src/minecraftnx
+
+          printf '%s\n' \
+          'package minecraftnx;' \
+          '' \
+          'public class CapabilityTest {' \
+          '' \
+          '    static class TestObject {' \
+          '        int value;' \
+          '' \
+          '        TestObject(int value) {' \
+          '            this.value = value;' \
+          '        }' \
+          '' \
+          '        int getValue() {' \
+          '            return value;' \
+          '        }' \
+          '    }' \
+          '' \
+          '    public static void main(String[] args) {' \
+          '' \
+          '        System.out.println("Minecraft-NX Java Capability Test");' \
+          '        System.out.println("===============================");' \
+          '' \
+          '        System.out.println("[1] JVM iniciou");' \
+          '' \
+          '        String text = "Minecraft-NX";' \
+          '        System.out.println("[2] String criada");' \
+          '        System.out.println(text);' \
+          '' \
+          '        TestObject object = new TestObject(1234);' \
+          '' \
+          '        if(object.getValue() == 1234) {' \
+          '            System.out.println("[3] Objetos/classes OK");' \
+          '        } else {' \
+          '            System.out.println("[3] Objetos/classes FALHOU");' \
+          '        }' \
+          '' \
+          '        int[] numbers = new int[5];' \
+          '        numbers[0] = 10;' \
+          '        numbers[1] = 20;' \
+          '        numbers[2] = 30;' \
+          '        numbers[3] = 40;' \
+          '        numbers[4] = 50;' \
+          '' \
+          '        int total = 0;' \
+          '' \
+          '        for(int i = 0; i < numbers.length; i++) {' \
+          '            total = total + numbers[i];' \
+          '        }' \
+          '' \
+          '        if(total == 150) {' \
+          '            System.out.println("[4] Arrays/loops OK");' \
+          '        } else {' \
+          '            System.out.println("[4] Arrays/loops FALHOU");' \
+          '        }' \
+          '' \
+          '        int a = 7;' \
+          '        int b = 6;' \
+          '        int result = (a * b) + 8;' \
+          '' \
+          '        if(result == 50) {' \
+          '            System.out.println("[5] Matematica OK");' \
+          '        } else {' \
+          '            System.out.println("[5] Matematica FALHOU");' \
+          '        }' \
+          '' \
+          '        System.out.println("[DONE] Teste concluido");' \
+          '        System.out.println("Use HOME para sair.");' \
+          '    }' \
+          '}' \
+          > capability/src/minecraftnx/CapabilityTest.java
+
+          echo "=== CapabilityTest.java ==="
+          cat capability/src/minecraftnx/CapabilityTest.java
+
+      # ------------------------------------------------------------
+      # Compila com bytecode antigo para maximizar compatibilidade
+      # com a VM experimental
+      # ------------------------------------------------------------
+
+      - name: Compile capability test
+        shell: bash
+        run: |
+          set -e
+
+          mkdir -p capability/classes
+
+          javac \
+            -source 8 \
+            -target 8 \
+            -d capability/classes \
+            capability/src/minecraftnx/CapabilityTest.java
+
+          printf '%s\n' \
+          'Manifest-Version: 1.0' \
+          'Main-Class: minecraftnx.CapabilityTest' \
+          '' \
+          > capability/MANIFEST.MF
+
+          jar cfm \
+            capability/capability-test.jar \
+            capability/MANIFEST.MF \
+            -C capability/classes .
+
+          echo "=== JAR criado ==="
+          ls -lh capability/capability-test.jar
+
+          echo ""
+          echo "=== Conteudo ==="
+          jar tf capability/capability-test.jar
+
+      # ------------------------------------------------------------
+      # Força javm.nro a executar nosso JAR
+      # ------------------------------------------------------------
+
+      - name: Patch direct capability launch
+        shell: bash
+        run: |
+          python3 -c 'from pathlib import Path; p=Path("javm-nx-poc/javm/source/Main.cpp"); s=p.read_text(); marker="int main(int argc, char **argv)"; marker2="int main(int argc, char *argv[])"; marker=marker if marker in s else marker2; assert marker in s, "main nao encontrado"; start=s.index(marker); brace=s.index("{", start)+1; patch="\n    static char direct_app[] = \"javm.nro\";\n    static char direct_jar[] = \"sdmc:/switch/minecraft-nx/tests/capability-test.jar\";\n    static char *direct_argv[] = { direct_app, direct_jar, nullptr };\n    argc = 2;\n    argv = direct_argv;\n"; p.write_text(s[:brace]+patch+s[brace:]); print(p.read_text())'
+
+      # ------------------------------------------------------------
+      # Compila JavaVM
+      # ------------------------------------------------------------
 
       - name: Build JavaVM
         working-directory: javm-nx-poc/javm
@@ -208,29 +336,9 @@ jobs:
           make clean || true
           make -j2
 
-      - name: Build nx Java library
-        working-directory: javm-nx-poc/nx/java
-        run: |
-          mvn package
-
-      - name: Build Java Hello World
-        working-directory: javm-nx-poc/java-hello-world
-        run: |
-          mvn package
-
-      - name: Show generated files
-        shell: bash
-        run: |
-          echo "=== NRO ==="
-          find javm-nx-poc -type f -name "*.nro" -print
-
-          echo ""
-          echo "=== JAR ==="
-          find javm-nx-poc -type f -name "*.jar" -print
-
-          echo ""
-          echo "=== SD OUT ==="
-          find javm-nx-poc/sd_out -type f -print || true
+      # ------------------------------------------------------------
+      # Pacote para SD
+      # ------------------------------------------------------------
 
       - name: Prepare SD package
         shell: bash
@@ -238,44 +346,28 @@ jobs:
           set -e
 
           rm -rf SD
-          mkdir -p SD
 
-          if [ -d javm-nx-poc/sd_out ]; then
-            cp -r javm-nx-poc/sd_out/. SD/
-          fi
-
-          mkdir -p SD/switch/javm
+          mkdir -p \
+            SD/switch/minecraft-nx/tests
 
           JAVM_NRO=$(find javm-nx-poc/javm -type f -name "javm.nro" | head -n 1)
 
           if [ -z "$JAVM_NRO" ]; then
             echo "ERRO: javm.nro nao encontrado"
-            find javm-nx-poc -type f -name "*.nro" -print
             exit 1
           fi
 
-          echo "javm.nro encontrado:"
-          echo "$JAVM_NRO"
+          cp \
+            "$JAVM_NRO" \
+            SD/switch/minecraft-nx/javm.nro
 
-          cp "$JAVM_NRO" SD/switch/javm/javm.nro
-
-          HELLO_JAR=$(find javm-nx-poc/java-hello-world/target -maxdepth 1 -type f -name "*.jar" | head -n 1)
-
-          if [ -z "$HELLO_JAR" ]; then
-            echo "ERRO: java-hello-world JAR nao encontrado"
-            find javm-nx-poc/java-hello-world -type f -name "*.jar" -print
-            exit 1
-          fi
-
-          echo "Hello World encontrado:"
-          echo "$HELLO_JAR"
-
-          mkdir -p SD/switch
-
-          cp "$HELLO_JAR" SD/switch/java-hello-world.jar
+          cp \
+            capability/capability-test.jar \
+            SD/switch/minecraft-nx/tests/capability-test.jar
 
           echo ""
           echo "=== PACOTE FINAL ==="
+
           find SD -type f -print
 
       - name: Verify SD package
@@ -283,21 +375,28 @@ jobs:
         run: |
           set -e
 
-          test -f SD/switch/javm/javm.nro
-          test -f SD/switch/java-hello-world.jar
+          test -f \
+            SD/switch/minecraft-nx/javm.nro
 
-          echo "=== JAVM ==="
-          ls -lh SD/switch/javm/javm.nro
+          test -f \
+            SD/switch/minecraft-nx/tests/capability-test.jar
+
+          echo "=== JavaVM ==="
+
+          ls -lh \
+            SD/switch/minecraft-nx/javm.nro
 
           echo ""
-          echo "=== HELLO WORLD ==="
-          ls -lh SD/switch/java-hello-world.jar
+          echo "=== Capability Test ==="
+
+          ls -lh \
+            SD/switch/minecraft-nx/tests/capability-test.jar
 
           echo ""
-          echo "PACOTE JAVA HID OK"
+          echo "PACOTE OK"
 
-      - name: Upload Java HID test
+      - name: Upload capability test
         uses: actions/upload-artifact@v4
         with:
-          name: Minecraft-NX-Java-HID-Test
+          name: Minecraft-NX-Java-Capability-Test
           path: SD
