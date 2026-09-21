@@ -1,0 +1,439 @@
+name: OpenJDK Horizon Research v0.1
+
+on:
+  workflow_dispatch:
+
+jobs:
+  openjdk-horizon:
+    runs-on: ubuntu-latest
+
+    container:
+      image: devkitpro/devkita64:latest
+
+    steps:
+
+      # ============================================================
+      # Minecraft-NX
+      # OpenJDK / Horizon Research v0.1
+      #
+      # Created by Farbert_Took
+      #
+      # OBJETIVO:
+      # - preservar o javm v5
+      # - validar devkitA64
+      # - baixar OpenJDK 21
+      # - identificar o host/build system
+      # - testar compilador ARM64
+      # - executar configure exploratorio
+      #
+      # NAO esperamos gerar uma JVM funcional nesta etapa.
+      # ============================================================
+
+      - name: Install research tools
+        shell: bash
+        run: |
+          set -e
+
+          apt-get update
+
+          apt-get install -y \
+            git \
+            bash \
+            autoconf \
+            make \
+            zip \
+            unzip \
+            file \
+            python3 \
+            build-essential \
+            ca-certificates
+
+          echo ""
+          echo "========================================"
+          echo " Minecraft-NX"
+          echo " OpenJDK Horizon Research v0.1"
+          echo " Created by Farbert_Took"
+          echo "========================================"
+
+      # ============================================================
+      # Mostra ambiente devkitPro
+      # ============================================================
+
+      - name: Inspect devkitPro environment
+        shell: bash
+        run: |
+          set -e
+
+          echo "DEVKITPRO=$DEVKITPRO"
+          echo "DEVKITA64=$DEVKITA64"
+
+          echo ""
+          echo "PATH:"
+          echo "$PATH"
+
+          echo ""
+          echo "devkitPro:"
+          ls -la /opt/devkitpro || true
+
+          echo ""
+          echo "devkitA64:"
+          ls -la /opt/devkitpro/devkitA64 || true
+
+          echo ""
+          echo "libnx:"
+          ls -la /opt/devkitpro/libnx || true
+
+      # ============================================================
+      # Localiza compiladores
+      # ============================================================
+
+      - name: Locate AArch64 toolchain
+        shell: bash
+        run: |
+          set -e
+
+          echo "===== GCC ====="
+
+          which aarch64-none-elf-gcc || true
+          aarch64-none-elf-gcc --version || true
+
+          echo ""
+          echo "===== G++ ====="
+
+          which aarch64-none-elf-g++ || true
+          aarch64-none-elf-g++ --version || true
+
+          echo ""
+          echo "===== LD ====="
+
+          which aarch64-none-elf-ld || true
+          aarch64-none-elf-ld --version || true
+
+          echo ""
+          echo "===== AR ====="
+
+          which aarch64-none-elf-ar || true
+          aarch64-none-elf-ar --version || true
+
+      # ============================================================
+      # Teste C ARM64 mínimo
+      #
+      # Aqui NÃO usamos libnx ainda.
+      # Queremos confirmar que o compilador consegue gerar objeto
+      # AArch64.
+      # ============================================================
+
+      - name: Test bare AArch64 compiler
+        shell: bash
+        run: |
+          set -e
+
+          rm -rf horizon-research
+          mkdir -p horizon-research
+
+          cat > horizon-research/test.c <<'EOF'
+          int minecraft_nx_test(void)
+          {
+              return 21;
+          }
+          EOF
+
+          aarch64-none-elf-gcc \
+            -march=armv8-a \
+            -c \
+            horizon-research/test.c \
+            -o horizon-research/test.o
+
+          echo ""
+          echo "===== FILE ====="
+          file horizon-research/test.o
+
+          echo ""
+          echo "===== SIZE ====="
+          ls -lh horizon-research/test.o
+
+      # ============================================================
+      # Teste C + libnx
+      #
+      # Confirma que o toolchain usado no nosso homebrew consegue
+      # compilar uma unidade que conhece switch.h.
+      # ============================================================
+
+      - name: Test libnx compilation
+        shell: bash
+        run: |
+          set -e
+
+          cat > horizon-research/horizon_test.c <<'EOF'
+          #include <switch.h>
+
+          int minecraft_nx_horizon_test(void)
+          {
+              u64 value = 21;
+              return (int)value;
+          }
+          EOF
+
+          aarch64-none-elf-gcc \
+            -march=armv8-a \
+            -D__SWITCH__ \
+            -I/opt/devkitpro/libnx/include \
+            -c \
+            horizon-research/horizon_test.c \
+            -o horizon-research/horizon_test.o
+
+          echo ""
+          echo "===== LIBNX OBJECT ====="
+          file horizon-research/horizon_test.o
+
+          ls -lh \
+            horizon-research/horizon_test.o
+
+      # ============================================================
+      # Baixa OpenJDK 21
+      #
+      # Usamos a linha jdk21u, em vez de alterar qualquer coisa
+      # relacionada ao nosso javm funcional.
+      # ============================================================
+
+      - name: Clone OpenJDK 21
+        shell: bash
+        run: |
+          set -e
+
+          rm -rf openjdk21
+
+          git clone \
+            --depth 1 \
+            --branch master \
+            https://github.com/openjdk/jdk21u.git \
+            openjdk21
+
+          echo ""
+          echo "===== OPENJDK ====="
+
+          git -C openjdk21 rev-parse HEAD
+          git -C openjdk21 status --short
+
+      # ============================================================
+      # Inspeciona plataformas que HotSpot conhece
+      # ============================================================
+
+      - name: Inspect HotSpot OS ports
+        shell: bash
+        run: |
+          set -e
+
+          echo ""
+          echo "===== HOTSPOT OS DIRECTORIES ====="
+
+          find \
+            openjdk21/src/hotspot/os \
+            -maxdepth 1 \
+            -mindepth 1 \
+            -type d \
+            -print \
+            | sort
+
+          echo ""
+          echo "===== HOTSPOT AARCH64 ====="
+
+          find \
+            openjdk21/src/hotspot/cpu/aarch64 \
+            -maxdepth 1 \
+            -type f \
+            | head -n 40
+
+      # ============================================================
+      # Procura dependências Linux/POSIX importantes
+      #
+      # Isso gera um relatório para nossa próxima etapa.
+      # ============================================================
+
+      - name: Inspect Linux dependencies
+        shell: bash
+        run: |
+          set -e
+
+          REPORT="../horizon-research/linux-dependencies.txt"
+
+          {
+            echo "Minecraft-NX"
+            echo "OpenJDK Horizon Research v0.1"
+            echo "Created by Farbert_Took"
+            echo ""
+            echo "Selected Linux/POSIX references in HotSpot:"
+            echo ""
+
+            grep -R -n -E \
+              'pthread_|mmap\(|munmap\(|dlopen\(|dlsym\(|sigaction\(|/proc/' \
+              src/hotspot/os/linux \
+              | head -n 500 \
+              || true
+
+          } > "$REPORT"
+
+          echo ""
+          echo "===== REPORT PREVIEW ====="
+
+          head -n 100 "$REPORT"
+
+        working-directory: openjdk21
+
+      # ============================================================
+      # Configure exploratório
+      #
+      # IMPORTANTE:
+      #
+      # O OpenJDK não possui target Horizon pronto.
+      #
+      # Portanto esta etapa PODE falhar.
+      # A falha é justamente o dado que queremos coletar.
+      #
+      # Não usamos "set -e" aqui porque queremos guardar o log.
+      # ============================================================
+
+      - name: Probe OpenJDK configure
+        shell: bash
+        run: |
+          set +e
+
+          cd openjdk21
+
+          bash configure \
+            --openjdk-target=aarch64-none-elf \
+            --with-toolchain-type=gcc \
+            CC=aarch64-none-elf-gcc \
+            CXX=aarch64-none-elf-g++ \
+            AR=aarch64-none-elf-ar \
+            NM=aarch64-none-elf-nm \
+            OBJCOPY=aarch64-none-elf-objcopy \
+            STRIP=aarch64-none-elf-strip \
+            2>&1 | tee ../horizon-research/configure.log
+
+          STATUS=${PIPESTATUS[0]}
+
+          echo "$STATUS" \
+            > ../horizon-research/configure-exit-code.txt
+
+          echo ""
+          echo "========================================"
+          echo " configure exit code: $STATUS"
+          echo "========================================"
+
+          exit 0
+
+      # ============================================================
+      # Extrai partes úteis do configure.log
+      # ============================================================
+
+      - name: Analyze configure result
+        shell: bash
+        run: |
+          set -e
+
+          echo "Minecraft-NX OpenJDK/Horizon v0.1" \
+            > horizon-research/summary.txt
+
+          echo "Created by Farbert_Took" \
+            >> horizon-research/summary.txt
+
+          echo "" \
+            >> horizon-research/summary.txt
+
+          echo "Configure exit code:" \
+            >> horizon-research/summary.txt
+
+          cat horizon-research/configure-exit-code.txt \
+            >> horizon-research/summary.txt
+
+          echo "" \
+            >> horizon-research/summary.txt
+
+          echo "Relevant configure messages:" \
+            >> horizon-research/summary.txt
+
+          grep -i -E \
+            'error|unsupported|target|host|aarch64|linux|sysroot|compiler' \
+            horizon-research/configure.log \
+            | tail -n 200 \
+            >> horizon-research/summary.txt \
+            || true
+
+          echo ""
+          echo "========================================"
+          echo " SUMMARY"
+          echo "========================================"
+
+          cat horizon-research/summary.txt
+
+      # ============================================================
+      # Guarda config.log também, se configure criou um
+      # ============================================================
+
+      - name: Collect OpenJDK config logs
+        shell: bash
+        run: |
+          set -e
+
+          find openjdk21 \
+            -type f \
+            \( \
+              -name "config.log" \
+              -o \
+              -name "configure.log" \
+            \) \
+            -print \
+            > horizon-research/config-files.txt \
+            || true
+
+          while IFS= read -r FILEPATH
+          do
+
+            if [ -f "$FILEPATH" ]; then
+
+              SAFE_NAME=$(echo "$FILEPATH" | tr '/' '_')
+
+              cp \
+                "$FILEPATH" \
+                "horizon-research/$SAFE_NAME"
+
+            fi
+
+          done < horizon-research/config-files.txt
+
+      # ============================================================
+      # Informações finais
+      # ============================================================
+
+      - name: Final research information
+        shell: bash
+        run: |
+          echo ""
+          echo "========================================"
+          echo " Minecraft-NX"
+          echo " OpenJDK Horizon Research v0.1"
+          echo " Created by Farbert_Took"
+          echo "========================================"
+
+          echo ""
+          echo "Arquivos coletados:"
+
+          find horizon-research \
+            -maxdepth 1 \
+            -type f \
+            -print
+
+          echo ""
+          echo "Esta build e diagnostica."
+          echo "Ela ainda nao gera Minecraft-NX.nro."
+
+      # ============================================================
+      # Artifact com os resultados
+      # ============================================================
+
+      - name: Upload Horizon research
+        uses: actions/upload-artifact@v4
+        with:
+          name: Minecraft-NX-Farbert_Took-OpenJDK-Horizon-v0.1
+          path: horizon-research
