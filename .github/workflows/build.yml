@@ -1,4 +1,4 @@
-name: Build Minecraft-NX Java Diagnostic
+name: Build Minecraft-NX Java Direct Test
 
 on:
   push:
@@ -26,7 +26,7 @@ jobs:
           name: Minecraft-NX-nro
           path: Minecraft-NX.nro
 
-  java-test:
+  java-direct-test:
     runs-on: ubuntu-latest
 
     container:
@@ -42,20 +42,58 @@ jobs:
         run: |
           git clone --recursive https://github.com/XorTroll/javm-nx-poc.git
 
-      - name: Patch JavaVM
+      - name: Patch JavaVM compatibility
         shell: bash
         run: |
           python3 -c 'from pathlib import Path; root=Path("javm-nx-poc"); files=[root/"libjavm/libjavm/include/javm/core/core_ClassObject.hpp",root/"libjavm/libjavm/include/javm/core/core_ManifestFile.hpp"]; [(p.write_text(("#include <algorithm>\n" if "#include <algorithm>" not in p.read_text() else "")+p.read_text())) for p in files]; p=root/"nx/native/nx_Java.hpp"; s=p.read_text(); p.write_text("\n".join(line for line in s.splitlines() if "Input.class.hpp" not in line and "LoadNativeClass<hid::Input>" not in line)+"\n")'
 
-      - name: Patch diagnostic
+      - name: Patch direct JAR launch
         shell: bash
         run: |
-          python3 -c 'from pathlib import Path; p=Path("javm-nx-poc/javm/source/Main.cpp"); s=p.read_text(); print(s); p.write_text(s.replace("consoleExit(NULL);", "printf(\"\\n[DEBUG] JavaVM chegou ao final do main.\\nUse HOME para sair.\\n\"); consoleUpdate(NULL); while (appletMainLoop()) { consoleUpdate(NULL); } consoleExit(NULL);"))'
+          python3 <<'PY'
+          from pathlib import Path
 
-      - name: Show patched Main
-        run: |
-          echo "=== Main.cpp PATCHED ==="
-          cat javm-nx-poc/javm/source/Main.cpp
+          p = Path("javm-nx-poc/javm/source/Main.cpp")
+          s = p.read_text()
+
+          print("=== ORIGINAL ===")
+          print(s)
+
+          marker = "int main(int argc, char **argv)"
+
+          if marker not in s:
+              marker = "int main(int argc, char *argv[])"
+
+          if marker not in s:
+              print("ERRO: assinatura main nao encontrada")
+              raise SystemExit(1)
+
+          start = s.index(marker)
+          brace = s.index("{", start) + 1
+
+          patch = r'''
+
+              // Minecraft-NX direct Java test
+              static char direct_jar[] = "sdmc:/switch/java-hello-world.jar";
+              static char direct_app[] = "javm.nro";
+              static char *direct_argv[] = {
+                  direct_app,
+                  direct_jar,
+                  nullptr
+              };
+
+              argc = 2;
+              argv = direct_argv;
+
+          '''
+
+          s = s[:brace] + patch + s[brace:]
+
+          p.write_text(s)
+
+          print("=== PATCHED ===")
+          print(p.read_text())
+          PY
 
       - name: Build JavaVM
         working-directory: javm-nx-poc/javm
@@ -69,17 +107,6 @@ jobs:
         working-directory: javm-nx-poc/java-hello-world
         run: mvn package
 
-      - name: Show generated files
-        run: |
-          echo "=== NRO ==="
-          find javm-nx-poc -type f -name "*.nro" -print
-
-          echo "=== JAR ==="
-          find javm-nx-poc -type f -name "*.jar" -print
-
-          echo "=== SD OUT ==="
-          find javm-nx-poc/sd_out -type f -print || true
-
       - name: Prepare SD package
         shell: bash
         run: |
@@ -88,71 +115,49 @@ jobs:
           rm -rf SD
           mkdir -p SD
 
-          echo "=== Copiando sd_out ==="
           cp -r javm-nx-poc/sd_out/. SD/
 
-          echo "=== Procurando javm.nro ==="
+          mkdir -p SD/switch/javm
 
           JAVM_NRO=$(find javm-nx-poc/javm -type f -name "javm.nro" | head -n 1)
 
           if [ -z "$JAVM_NRO" ]; then
             echo "ERRO: javm.nro nao encontrado"
-            echo "NROs existentes:"
-            find javm-nx-poc -type f -name "*.nro" -print
             exit 1
           fi
 
-          echo "Encontrado:"
-          echo "$JAVM_NRO"
-
-          mkdir -p SD/switch/javm
-
           cp "$JAVM_NRO" SD/switch/javm/javm.nro
-
-          echo "=== Procurando Hello World ==="
 
           HELLO_JAR=$(find javm-nx-poc/java-hello-world/target -maxdepth 1 -type f -name "*.jar" | head -n 1)
 
           if [ -z "$HELLO_JAR" ]; then
-            echo "ERRO: java-hello-world.jar nao encontrado"
+            echo "ERRO: Hello World JAR nao encontrado"
             exit 1
           fi
 
-          echo "Encontrado:"
-          echo "$HELLO_JAR"
-
-          mkdir -p SD/switch
-
           cp "$HELLO_JAR" SD/switch/java-hello-world.jar
 
-          echo ""
-          echo "=== PACOTE FINAL ==="
+          echo "=== PACOTE ==="
           find SD -type f -print
 
-      - name: Verify SD package
+      - name: Verify package
         shell: bash
         run: |
           set -e
 
-          echo "=== Verificando javm.nro ==="
           test -f SD/switch/javm/javm.nro
-
-          echo "=== Verificando Hello World ==="
           test -f SD/switch/java-hello-world.jar
 
-          echo "=== Verificando file association ==="
-          test -f SD/config/nx-hbmenu/fileassoc/javm.cfg
-
-          echo ""
-          echo "=== TAMANHOS ==="
+          echo "=== JAVM ==="
           ls -lh SD/switch/javm/javm.nro
+
+          echo "=== HELLO WORLD ==="
           ls -lh SD/switch/java-hello-world.jar
 
-          echo ""
-          echo "PACOTE JAVA OK"
+          echo "PACOTE OK"
 
-      - name: Upload Java diagnostic
+      - name: Upload direct test
         uses: actions/upload-artifact@v4
         with:
-          name: Minecraft-NX-Java-Diagnostic-SD
+          name: Minecraft-NX-Java-Direct-Test
           path: SD
