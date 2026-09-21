@@ -1,4 +1,4 @@
-name: Minecraft-NX Java Diagnostic v3
+name: Minecraft-NX Java Diagnostic v3.1
 
 on:
   push:
@@ -33,17 +33,26 @@ jobs:
       image: devkitpro/devkita64:latest
 
     steps:
+
+      # ============================================================
+      # Ferramentas
+      # ============================================================
+
       - name: Install tools
         run: |
           apt-get update
           apt-get install -y git python3 maven
+
+      # ============================================================
+      # JavaVM
+      # ============================================================
 
       - name: Clone JavaVM
         run: |
           git clone --recursive https://github.com/XorTroll/javm-nx-poc.git
 
       # ============================================================
-      # C++ compatibility
+      # Compatibilidade C++
       # ============================================================
 
       - name: Patch algorithm compatibility
@@ -52,7 +61,7 @@ jobs:
           python3 -c 'from pathlib import Path; files=[Path("javm-nx-poc/libjavm/libjavm/include/javm/core/core_ClassObject.hpp"),Path("javm-nx-poc/libjavm/libjavm/include/javm/core/core_ManifestFile.hpp")]; [(p.write_text(("#include <algorithm>\n" if "#include <algorithm>" not in p.read_text() else "")+p.read_text())) for p in files]'
 
       # ============================================================
-      # HID moderno - mesma base que executou Hello World
+      # HID moderno
       # ============================================================
 
       - name: Port HID to modern libnx
@@ -191,6 +200,10 @@ jobs:
           }
           """; p.write_text(s)'
 
+      # ============================================================
+      # Confirma que HID continua registrado
+      # ============================================================
+
       - name: Verify HID
         shell: bash
         run: |
@@ -203,7 +216,10 @@ jobs:
           echo "HID OK"
 
       # ============================================================
-      # Java: usa exatamente Main.java do exemplo original
+      # Java minimo
+      #
+      # Mantemos o projeto java-hello-world original.
+      # Alteramos somente Main.java.
       # ============================================================
 
       - name: Create minimal Minecraft-NX Java test
@@ -213,26 +229,36 @@ jobs:
 
           if [ -z "$MAIN_JAVA" ]; then
             echo "ERRO: Main.java nao encontrado"
+
+            find \
+              javm-nx-poc/java-hello-world \
+              -type f \
+              -print
+
             exit 1
           fi
 
-          echo "Main original:"
+          echo "Main.java encontrado:"
           echo "$MAIN_JAVA"
 
           printf '%s\n' \
           'package javmnx.helloworld;' \
           '' \
           'public class Main {' \
+          '' \
           '    public static void main(String[] args) {' \
+          '' \
           '        System.out.println("Minecraft-NX");' \
           '        System.out.println("Created by Farbert_Took");' \
           '        System.out.println("[1] JVM OK");' \
+          '' \
           '    }' \
           '}' \
           > "$MAIN_JAVA"
 
           echo ""
           echo "=== Main.java ==="
+
           cat "$MAIN_JAVA"
 
       # ============================================================
@@ -245,7 +271,7 @@ jobs:
           mvn package
 
       # ============================================================
-      # JAR usando exatamente o Maven original
+      # Compila JAR usando o Maven original
       # ============================================================
 
       - name: Build Java diagnostic
@@ -253,21 +279,24 @@ jobs:
         run: |
           mvn clean package
 
-      - name: Locate Java JAR
+      # ============================================================
+      # Mostra JAR gerado
+      # ============================================================
+
+      - name: Show generated JAR
         shell: bash
         run: |
           echo "=== JARs ==="
-          find javm-nx-poc/java-hello-world/target \
+
+          find \
+            javm-nx-poc/java-hello-world/target \
             -maxdepth 1 \
             -type f \
             -name "*.jar" \
             -print
 
       # ============================================================
-      # Direct launch
-      #
-      # IMPORTANTE:
-      # mantemos o nome javm.nro.
+      # Forca javm.nro a abrir test.jar
       # ============================================================
 
       - name: Patch direct launch
@@ -276,18 +305,32 @@ jobs:
           python3 -c 'from pathlib import Path; p=Path("javm-nx-poc/javm/source/Main.cpp"); s=p.read_text(); marker="int main(int argc, char **argv)"; marker2="int main(int argc, char *argv[])"; marker=marker if marker in s else marker2; assert marker in s, "main nao encontrado"; start=s.index(marker); brace=s.index("{", start)+1; patch="\n    static char direct_app[] = \"javm.nro\";\n    static char direct_jar[] = \"sdmc:/switch/minecraft-nx/test.jar\";\n    static char *direct_argv[] = { direct_app, direct_jar, nullptr };\n    argc = 2;\n    argv = direct_argv;\n"; p.write_text(s[:brace]+patch+s[brace:]); print(p.read_text())'
 
       # ============================================================
-      # PAUSA DE DIAGNOSTICO
+      # IMPORTANTE:
+      # Mostra o Main.cpp REAL.
       #
-      # Se a VM terminar normalmente, nao fecha imediatamente.
+      # Se o Switch ainda fechar, este log vai permitir colocar
+      # checkpoints exatamente nos lugares corretos.
       # ============================================================
 
-      - name: Patch exit diagnostic
+      - name: Diagnostic Main.cpp
         shell: bash
         run: |
-          python3 -c 'from pathlib import Path; p=Path("javm-nx-poc/javm/source/Main.cpp"); s=p.read_text(); old="consoleExit(NULL);"; new="printf(\"\\n[Minecraft-NX] Java retornou ao launcher.\\n\"); printf(\"Created by Farbert_Took\\n\"); printf(\"Use HOME para sair.\\n\"); consoleUpdate(NULL); while (appletMainLoop()) { consoleUpdate(NULL); } consoleExit(NULL);"; assert old in s, "consoleExit nao encontrado"; p.write_text(s.replace(old,new)); print(p.read_text())'
+          echo ""
+          echo "========================================"
+          echo " Minecraft-NX - Main.cpp diagnostic"
+          echo " Created by Farbert_Took"
+          echo "========================================"
+          echo ""
+
+          cat javm-nx-poc/javm/source/Main.cpp
+
+          echo ""
+          echo "========================================"
+          echo " END Main.cpp"
+          echo "========================================"
 
       # ============================================================
-      # Compila javm
+      # Compila JavaVM
       # ============================================================
 
       - name: Build JavaVM
@@ -297,7 +340,22 @@ jobs:
           make -j2
 
       # ============================================================
-      # Pacote SD
+      # Mostra NRO gerado
+      # ============================================================
+
+      - name: Show generated NRO
+        shell: bash
+        run: |
+          echo "=== NROs ==="
+
+          find \
+            javm-nx-poc \
+            -type f \
+            -name "*.nro" \
+            -print
+
+      # ============================================================
+      # Pacote para SD
       # ============================================================
 
       - name: Prepare SD package
@@ -316,13 +374,35 @@ jobs:
 
           if [ -z "$JAVM_NRO" ]; then
             echo "ERRO: javm.nro nao encontrado"
+
+            find \
+              javm-nx-poc \
+              -type f \
+              -name "*.nro" \
+              -print
+
             exit 1
           fi
 
           if [ -z "$TEST_JAR" ]; then
-            echo "ERRO: JAR nao encontrado"
+            echo "ERRO: test.jar nao encontrado"
+
+            find \
+              javm-nx-poc/java-hello-world \
+              -type f \
+              -name "*.jar" \
+              -print
+
             exit 1
           fi
+
+          echo ""
+          echo "JavaVM:"
+          echo "$JAVM_NRO"
+
+          echo ""
+          echo "Java test:"
+          echo "$TEST_JAR"
 
           cp \
             "$JAVM_NRO" \
@@ -333,16 +413,18 @@ jobs:
             SD/switch/minecraft-nx/test.jar
 
           echo ""
-          echo "=== Minecraft-NX Diagnostic v3 ==="
-          echo "Created by Farbert_Took"
+          echo "========================================"
+          echo " Minecraft-NX Diagnostic v3.1"
+          echo " Created by Farbert_Took"
+          echo "========================================"
 
           echo ""
-          echo "=== ARQUIVOS ==="
+          echo "=== PACOTE FINAL ==="
 
           find SD -type f -print
 
       # ============================================================
-      # Verificacao
+      # Verificacao final
       # ============================================================
 
       - name: Verify package
@@ -369,7 +451,8 @@ jobs:
             SD/switch/minecraft-nx/test.jar
 
           echo ""
-          echo "Minecraft-NX Diagnostic v3 OK"
+          echo "Minecraft-NX Diagnostic v3.1 OK"
+          echo "Created by Farbert_Took"
 
       # ============================================================
       # Artifact
@@ -378,5 +461,5 @@ jobs:
       - name: Upload diagnostic
         uses: actions/upload-artifact@v4
         with:
-          name: Minecraft-NX-Farbert_Took-Diagnostic-v3
+          name: Minecraft-NX-Farbert_Took-Diagnostic-v3.1
           path: SD
