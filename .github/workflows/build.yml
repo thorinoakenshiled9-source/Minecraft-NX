@@ -73,8 +73,10 @@ jobs:
         run: |
           echo "=== NRO ==="
           find javm-nx-poc -type f -name "*.nro" -print
+
           echo "=== JAR ==="
           find javm-nx-poc -type f -name "*.jar" -print
+
           echo "=== SD OUT ==="
           find javm-nx-poc/sd_out -type f -print || true
 
@@ -82,26 +84,75 @@ jobs:
         shell: bash
         run: |
           set -e
+
           rm -rf SD
           mkdir -p SD
 
+          echo "=== Copiando sd_out ==="
           cp -r javm-nx-poc/sd_out/. SD/
+
+          echo "=== Procurando javm.nro ==="
+
+          JAVM_NRO=$(find javm-nx-poc/javm -type f -name "javm.nro" | head -n 1)
+
+          if [ -z "$JAVM_NRO" ]; then
+            echo "ERRO: javm.nro nao encontrado"
+            echo "NROs existentes:"
+            find javm-nx-poc -type f -name "*.nro" -print
+            exit 1
+          fi
+
+          echo "Encontrado:"
+          echo "$JAVM_NRO"
+
+          mkdir -p SD/switch/javm
+
+          cp "$JAVM_NRO" SD/switch/javm/javm.nro
+
+          echo "=== Procurando Hello World ==="
 
           HELLO_JAR=$(find javm-nx-poc/java-hello-world/target -maxdepth 1 -type f -name "*.jar" | head -n 1)
 
           if [ -z "$HELLO_JAR" ]; then
-            echo "Hello World JAR nao encontrado"
+            echo "ERRO: java-hello-world.jar nao encontrado"
             exit 1
           fi
 
+          echo "Encontrado:"
+          echo "$HELLO_JAR"
+
           mkdir -p SD/switch
+
           cp "$HELLO_JAR" SD/switch/java-hello-world.jar
 
+          echo ""
           echo "=== PACOTE FINAL ==="
           find SD -type f -print
 
       - name: Verify SD package
+        shell: bash
         run: |
+          set -e
+
+          echo "=== Verificando javm.nro ==="
           test -f SD/switch/javm/javm.nro
+
+          echo "=== Verificando Hello World ==="
           test -f SD/switch/java-hello-world.jar
-          test -f SD/config/nx-hbmenu/fileassoc
+
+          echo "=== Verificando file association ==="
+          test -f SD/config/nx-hbmenu/fileassoc/javm.cfg
+
+          echo ""
+          echo "=== TAMANHOS ==="
+          ls -lh SD/switch/javm/javm.nro
+          ls -lh SD/switch/java-hello-world.jar
+
+          echo ""
+          echo "PACOTE JAVA OK"
+
+      - name: Upload Java diagnostic
+        uses: actions/upload-artifact@v4
+        with:
+          name: Minecraft-NX-Java-Diagnostic-SD
+          path: SD
