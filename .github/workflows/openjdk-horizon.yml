@@ -1,4 +1,4 @@
-name: OpenJDK Horizon Research v0.6
+name: OpenJDK Horizon Research v0.7
 
 on:
   workflow_dispatch:
@@ -19,30 +19,32 @@ jobs:
 
       # ============================================================
       # Minecraft-NX
-      # OpenJDK / Horizon Research v0.6
+      # OpenJDK / Horizon Research v0.7
       # Created by Farbert_Took
       #
-      # Confirmado:
+      # Confirmado ate v0.6:
       #
-      #   Horizon target recognition       OK
-      #   horizon-aarch64                  OK
-      #   Boot JDK 20                      OK
-      #   devkitA64 GCC/G++                OK
-      #   Cross compilation                OK
-      #   Target 64-bit                    OK
+      #   Horizon recognition             OK
+      #   horizon-aarch64                 OK
+      #   Boot JDK 20                     OK
+      #   devkitA64 GCC/G++               OK
+      #   Cross compilation               OK
+      #   Target 64-bit                   OK
+      #   libjpeg                         bundled
+      #   giflib                          bundled
+      #   libpng                          bundled
+      #   zlib                            bundled
+      #   CUPS                            bypass Horizon
       #
-      # v0.5 mostrou que CUPS do Linux host nao pode simplesmente
-      # ser usado pelo compilador Horizon.
+      # v0.7:
       #
-      # v0.6:
+      #   Fontconfig                      bypass Horizon
       #
-      #   - identifica a checagem CUPS
-      #   - desativa CUPS especificamente para Horizon
-      #   - NAO linka libcups Linux ao target
-      #   - continua o configure
-      #   - captura a proxima barreira
+      # Objetivo:
+      # continuar o configure ate encontrar a proxima barreira.
       #
-      # Ainda NAO esperamos uma JVM/NRO funcional.
+      # Os bypasses sao apenas de pesquisa.
+      # Eles NAO significam que java.desktop funciona no Horizon.
       # ============================================================
 
 
@@ -80,7 +82,7 @@ jobs:
           echo ""
           echo "========================================"
           echo " Minecraft-NX"
-          echo " OpenJDK Horizon Research v0.6"
+          echo " OpenJDK Horizon Research v0.7"
           echo " Created by Farbert_Took"
           echo "========================================"
 
@@ -102,7 +104,7 @@ jobs:
 
 
       # ============================================================
-      # 3. Verifica toolchain
+      # 3. Toolchain
       # ============================================================
 
       - name: Verify devkitA64
@@ -142,13 +144,13 @@ jobs:
 
           {
             echo "Minecraft-NX"
-            echo "OpenJDK Horizon Research v0.6"
+            echo "OpenJDK Horizon Research v0.7"
             echo "Created by Farbert_Took"
           } > horizon-research/info.txt
 
 
       # ============================================================
-      # 5. Teste libnx
+      # 5. Teste Horizon/libnx
       # ============================================================
 
       - name: Verify Horizon compilation
@@ -206,7 +208,7 @@ jobs:
             "https://api.adoptium.net/v3/binary/latest/20/ga/linux/x64/jdk/hotspot/normal/eclipse"
 
           echo ""
-          echo "Extraindo..."
+          echo "Extraindo Boot JDK..."
 
           tar \
             -xzf /tmp/bootjdk.tar.gz \
@@ -269,12 +271,11 @@ jobs:
 
 
       # ============================================================
-      # 9. Patch de reconhecimento Horizon
+      # 9. Horizon OS mapping
       #
-      # Mantemos:
-      #
-      #     elf -> horizon
-      #
+      # aarch64-none-elf
+      #       ↓
+      # horizon-aarch64
       # ============================================================
 
       - name: Add Horizon OS mapping
@@ -348,49 +349,39 @@ jobs:
 
 
       # ============================================================
-      # 10. Localiza implementacao CUPS
+      # 10. Localiza CUPS e Fontconfig
       # ============================================================
 
-      - name: Inspect OpenJDK CUPS checks
+      - name: Inspect desktop library checks
         shell: bash
         run: |
           set -e
 
           echo ""
-          echo "===== CUPS CONFIGURE REFERENCES ====="
+          echo "===== CUPS ====="
 
           grep -R -n -E \
-            'Could not find cups|cups/cups.h|cups/ppd.h|CUPS_FOUND|CUPS_CFLAGS|CUPS_LIBS' \
+            'Could not find cups|cups/cups.h|cups/ppd.h' \
             openjdk21/make/autoconf \
             2>/dev/null \
-            | tee horizon-research/cups-configure-search.txt \
+            | tee horizon-research/cups-search.txt \
             || true
 
           echo ""
-          echo "===== CUPS SOURCE REFERENCES ====="
+          echo "===== FONTCONFIG ====="
 
-          grep -R -n \
-            '#include <cups/' \
-            openjdk21/src \
+          grep -R -n -E \
+            'Could not find fontconfig|fontconfig/fontconfig.h|FONTCONFIG' \
+            openjdk21/make/autoconf \
             2>/dev/null \
-            | head -n 300 \
-            | tee horizon-research/cups-source-search.txt \
+            | tee horizon-research/fontconfig-search.txt \
             || true
 
 
       # ============================================================
-      # 11. Patch CUPS para Horizon
+      # 11. Bypass CUPS para Horizon
       #
-      # IMPORTANTE:
-      #
-      # Nao adicionamos /usr/include/cups ao cross compiler.
-      # Nao adicionamos -lcups do Linux.
-      #
-      # Em vez disso, para o target Horizon, pulamos a verificacao
-      # da biblioteca de impressao.
-      #
-      # Este e um patch de pesquisa. Mais tarde o modulo desktop
-      # precisara ser configurado/portado corretamente.
+      # NAO usa headers/bibliotecas CUPS do Linux.
       # ============================================================
 
       - name: Disable CUPS requirement for Horizon
@@ -403,31 +394,10 @@ jobs:
 
           root = Path("openjdk21/make/autoconf")
 
-          candidates = []
-
-          for p in root.rglob("*.m4"):
-              text = p.read_text(errors="ignore")
-
-              if (
-                  "Could not find cups" in text
-                  or "cups/cups.h" in text
-                  or "CUPS_FOUND" in text
-              ):
-                  candidates.append(p)
-
-          if not candidates:
-              raise SystemExit(
-                  "Nao encontrei arquivo de configuracao CUPS"
-              )
-
-          print("Arquivos CUPS encontrados:")
-
-          for p in candidates:
-              print(" -", p)
-
           target = None
 
-          for p in candidates:
+          for p in root.rglob("*.m4"):
+
               text = p.read_text(errors="ignore")
 
               if "Could not find cups" in text:
@@ -436,25 +406,18 @@ jobs:
 
           if target is None:
               raise SystemExit(
-                  "Nao encontrei a mensagem fatal de CUPS"
+                  "Nao encontrei checagem fatal CUPS"
               )
 
           text = target.read_text()
 
-          marker = 'AC_MSG_ERROR([Could not find cups!'
-
-          pos = text.find(marker)
-
-          if pos < 0:
-              # Fallback para pequenas mudancas no texto.
-              pos = text.find("Could not find cups")
+          pos = text.find("Could not find cups")
 
           if pos < 0:
               raise SystemExit(
-                  "Nao localizei a checagem fatal CUPS"
+                  "Mensagem CUPS nao encontrada"
               )
 
-          # Localiza a linha completa contendo o erro.
           line_start = text.rfind("\n", 0, pos) + 1
           line_end = text.find("\n", pos)
 
@@ -496,57 +459,162 @@ jobs:
               "horizon-research/cups-patched-file.txt"
           ).write_text(str(target) + "\n")
 
-          print()
-          print("Patch CUPS aplicado em:", target)
-          print()
-          print("Linha original:")
-          print(original_line)
+          print("CUPS Horizon bypass aplicado:", target)
           PY
-
-          echo ""
-          echo "===== CUPS PATCH CONTEXT ====="
 
           CUPS_FILE=$(cat horizon-research/cups-patched-file.txt)
 
+          echo ""
+          echo "===== CUPS PATCH ====="
+
           grep \
             -n \
-            -C 20 \
+            -C 15 \
             'CUPS disabled for experimental Horizon target' \
             "$CUPS_FILE" \
             | tee horizon-research/cups-patch-context.txt
 
 
       # ============================================================
-      # 12. Salva patch completo
+      # 12. Bypass Fontconfig para Horizon
+      #
+      # Mesma regra:
+      #
+      # - nao usa /usr/include/fontconfig
+      # - nao usa libfontconfig Linux
+      # - nao afirma que Fontconfig existe no Horizon
+      #
+      # Apenas permite que o configure de pesquisa continue.
       # ============================================================
 
-      - name: Save OpenJDK Horizon v0.6 patch
+      - name: Disable Fontconfig requirement for Horizon
+        shell: bash
+        run: |
+          set -e
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path("openjdk21/make/autoconf")
+
+          target = None
+
+          for p in root.rglob("*.m4"):
+
+              text = p.read_text(errors="ignore")
+
+              if "Could not find fontconfig" in text:
+                  target = p
+                  break
+
+          if target is None:
+              raise SystemExit(
+                  "Nao encontrei checagem fatal Fontconfig"
+              )
+
+          text = target.read_text()
+
+          pos = text.find("Could not find fontconfig")
+
+          if pos < 0:
+              raise SystemExit(
+                  "Mensagem Fontconfig nao encontrada"
+              )
+
+          line_start = text.rfind("\n", 0, pos) + 1
+          line_end = text.find("\n", pos)
+
+          if line_end < 0:
+              line_end = len(text)
+
+          original_line = text[line_start:line_end]
+
+          indent = original_line[
+              :len(original_line) - len(original_line.lstrip())
+          ]
+
+          replacement = (
+              indent
+              + 'if test "x$OPENJDK_TARGET_OS" = "xhorizon"; then\n'
+              + indent
+              + '  AC_MSG_WARN([Fontconfig disabled for experimental Horizon target])\n'
+              + indent
+              + '  FONTCONFIG_CFLAGS=""\n'
+              + indent
+              + '  FONTCONFIG_LIBS=""\n'
+              + indent
+              + 'else\n'
+              + original_line
+              + '\n'
+              + indent
+              + 'fi'
+          )
+
+          text = (
+              text[:line_start]
+              + replacement
+              + text[line_end:]
+          )
+
+          target.write_text(text)
+
+          Path(
+              "horizon-research/fontconfig-patched-file.txt"
+          ).write_text(str(target) + "\n")
+
+          print(
+              "Fontconfig Horizon bypass aplicado:",
+              target
+          )
+          PY
+
+          FONTCONFIG_FILE=$(
+            cat horizon-research/fontconfig-patched-file.txt
+          )
+
+          echo ""
+          echo "===== FONTCONFIG PATCH ====="
+
+          grep \
+            -n \
+            -C 15 \
+            'Fontconfig disabled for experimental Horizon target' \
+            "$FONTCONFIG_FILE" \
+            | tee horizon-research/fontconfig-patch-context.txt
+
+
+      # ============================================================
+      # 13. Salva diff completo
+      # ============================================================
+
+      - name: Save OpenJDK Horizon v0.7 patch
         shell: bash
         run: |
           set -e
 
           git -C openjdk21 diff \
-            > horizon-research/openjdk-horizon-v0.6.patch
+            > horizon-research/openjdk-horizon-v0.7.patch
 
           echo ""
           echo "========================================"
-          echo " PATCH v0.6"
+          echo " PATCH v0.7"
           echo "========================================"
 
-          cat horizon-research/openjdk-horizon-v0.6.patch
+          cat horizon-research/openjdk-horizon-v0.7.patch
 
 
       # ============================================================
-      # 13. Configure
+      # 14. Configure
       #
       # Esperado:
       #
-      # CUPS disabled for experimental Horizon target
+      # CUPS disabled...
+      # Fontconfig disabled...
       #
-      # seguido de uma nova verificacao/barreira.
+      # Depois queremos descobrir a proxima barreira.
       # ============================================================
 
-      - name: Probe OpenJDK after Horizon CUPS patch
+      - name: Probe OpenJDK after Fontconfig patch
         shell: bash
         run: |
           set +e
@@ -563,7 +631,7 @@ jobs:
             NM=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-nm \
             OBJCOPY=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-objcopy \
             STRIP=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-strip \
-            2>&1 | tee ../horizon-research/configure-v0.6.log
+            2>&1 | tee ../horizon-research/configure-v0.7.log
 
           STATUS=${PIPESTATUS[0]}
 
@@ -579,10 +647,10 @@ jobs:
 
 
       # ============================================================
-      # 14. Summary
+      # 15. Summary
       # ============================================================
 
-      - name: Analyze v0.6 result
+      - name: Analyze v0.7 result
         shell: bash
         run: |
           set -e
@@ -590,7 +658,7 @@ jobs:
           {
             echo "========================================"
             echo " Minecraft-NX"
-            echo " OpenJDK Horizon Research v0.6"
+            echo " OpenJDK Horizon Research v0.7"
             echo " Created by Farbert_Took"
             echo "========================================"
 
@@ -609,23 +677,23 @@ jobs:
             echo ""
 
             grep -i -E \
-              'error|warning|unsupported|horizon|target|host|aarch64|elf|sysroot|compiler|toolchain|boot jdk|bootjdk|cups|freetype|fontconfig|alsa|x11|libc|posix|linux|library|libraries|header|headers|jpeg|gif|png|zlib' \
-              horizon-research/configure-v0.6.log \
-              | tail -n 1000 \
+              'error|warning|unsupported|horizon|target|host|aarch64|elf|sysroot|compiler|toolchain|boot jdk|bootjdk|cups|fontconfig|freetype|alsa|x11|libx|libc|posix|linux|library|libraries|header|headers|jpeg|gif|png|zlib' \
+              horizon-research/configure-v0.7.log \
+              | tail -n 1200 \
               || true
 
-          } > horizon-research/summary-v0.6.txt
+          } > horizon-research/summary-v0.7.txt
 
           echo ""
           echo "========================================"
-          echo " SUMMARY v0.6"
+          echo " SUMMARY v0.7"
           echo "========================================"
 
-          cat horizon-research/summary-v0.6.txt
+          cat horizon-research/summary-v0.7.txt
 
 
       # ============================================================
-      # 15. Ultimas 250 linhas
+      # 16. Ultimas linhas sem filtro
       # ============================================================
 
       - name: Show configure tail
@@ -635,53 +703,53 @@ jobs:
 
           echo ""
           echo "========================================"
-          echo " LAST 250 CONFIGURE LINES"
+          echo " LAST 300 CONFIGURE LINES"
           echo "========================================"
 
           tail \
-            -n 250 \
-            horizon-research/configure-v0.6.log \
-            | tee horizon-research/configure-tail-v0.6.txt
+            -n 300 \
+            horizon-research/configure-v0.7.log \
+            | tee horizon-research/configure-tail-v0.7.txt
 
 
       # ============================================================
-      # 16. Procura novas dependencias
+      # 17. Procura outras dependencias desktop
       # ============================================================
 
-      - name: Inspect native library checks
+      - name: Inspect next desktop dependencies
         shell: bash
         run: |
           set +e
 
           {
             echo "Minecraft-NX"
-            echo "OpenJDK Horizon Research v0.6"
+            echo "OpenJDK Horizon Research v0.7"
             echo "Created by Farbert_Took"
 
             echo ""
-            echo "===== LIBRARY CHECKS ====="
+            echo "===== DESKTOP LIBRARY REFERENCES ====="
 
             grep -R -n -E \
-              'AC_CHECK_HEADERS|AC_CHECK_LIB|PKG_CHECK_MODULES|AC_MSG_ERROR.*find|AC_MSG_ERROR.*library' \
+              'ALSA|X11|Xext|Xrender|Xtst|Xi|freetype|fontconfig|cups|harfbuzz' \
               openjdk21/make/autoconf \
-              | head -n 2500
+              | head -n 3000
 
-          } > horizon-research/native-library-checks.txt
+          } > horizon-research/desktop-library-references.txt
 
           exit 0
 
 
       # ============================================================
-      # 17. Investiga codigo nativo que ja depende de OS
+      # 18. HotSpot OS ports
       # ============================================================
 
-      - name: Inspect Horizon source requirements
+      - name: Record HotSpot ports
         shell: bash
         run: |
-          set +e
+          set -e
 
           {
-            echo "===== HOTSPOT OS PORTS ====="
+            echo "===== HotSpot OS ports ====="
             echo ""
 
             find \
@@ -693,7 +761,7 @@ jobs:
               | sort
 
             echo ""
-            echo "===== HOTSPOT OS CPU PORTS ====="
+            echo "===== HotSpot OS/CPU ports ====="
             echo ""
 
             find \
@@ -704,29 +772,13 @@ jobs:
               -printf '%f\n' \
               | sort
 
-            echo ""
-            echo "===== JDK UNIX SOURCES ====="
-            echo ""
+          } > horizon-research/hotspot-ports.txt
 
-            find \
-              openjdk21/src \
-              -type d \
-              \( \
-                -name linux \
-                -o \
-                -name unix \
-                -o \
-                -name posix \
-              \) \
-              | head -n 500
-
-          } > horizon-research/horizon-source-requirements.txt
-
-          exit 0
+          cat horizon-research/hotspot-ports.txt
 
 
       # ============================================================
-      # 18. Coleta config.log
+      # 19. Coleta config.log
       # ============================================================
 
       - name: Collect configuration logs
@@ -763,10 +815,10 @@ jobs:
 
 
       # ============================================================
-      # 19. Resultado
+      # 20. Resultado final
       # ============================================================
 
-      - name: Final v0.6 report
+      - name: Final v0.7 report
         shell: bash
         run: |
           set -e
@@ -774,7 +826,7 @@ jobs:
           echo ""
           echo "========================================"
           echo " Minecraft-NX"
-          echo " OpenJDK Horizon Research v0.6"
+          echo " OpenJDK Horizon Research v0.7"
           echo " Created by Farbert_Took"
           echo "========================================"
 
@@ -790,20 +842,18 @@ jobs:
             | sort
 
           echo ""
-          echo "IMPORTANTE:"
+          echo "Os bypasses CUPS/Fontconfig sao de pesquisa."
+          echo "Eles nao implementam essas bibliotecas no Horizon."
           echo ""
-          echo "O bypass CUPS desta versao e apenas para pesquisa."
-          echo "Ele nao significa que CUPS funciona no Horizon."
-          echo ""
-          echo "Ainda nao geramos uma JVM/NRO funcional."
+          echo "Ainda nao temos uma JVM OpenJDK funcional."
 
 
       # ============================================================
-      # 20. Artifact
+      # 21. Artifact
       # ============================================================
 
-      - name: Upload Horizon Research v0.6
+      - name: Upload Horizon Research v0.7
         uses: actions/upload-artifact@v4
         with:
-          name: Minecraft-NX-Farbert_Took-OpenJDK-Horizon-v0.6
+          name: Minecraft-NX-Farbert_Took-OpenJDK-Horizon-v0.7
           path: horizon-research
