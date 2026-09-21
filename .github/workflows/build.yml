@@ -3,20 +3,30 @@ name: Build Minecraft-NX + JavaVM
 on:
   workflow_dispatch:
   push:
-    branches: [ "main", "master" ]
+    branches:
+      - main
+      - master
 
 jobs:
+
   build-minecraft-nx:
     runs-on: ubuntu-latest
+
     container:
       image: devkitpro/devkita64:latest
 
     steps:
+
       - name: Checkout Minecraft-NX
         uses: actions/checkout@v4
 
       - name: Build Minecraft-NX
         run: make -j2
+
+      - name: Verify Minecraft-NX
+        run: |
+          test -f Minecraft-NX.nro
+          ls -lh Minecraft-NX.nro
 
       - name: Upload Minecraft-NX
         uses: actions/upload-artifact@v4
@@ -24,12 +34,15 @@ jobs:
           name: Minecraft-NX-nro
           path: Minecraft-NX.nro
 
-    build-javm:
+
+  build-javm:
     runs-on: ubuntu-latest
+
     container:
       image: devkitpro/devkita64:latest
 
     steps:
+
       - name: Install git
         run: |
           apt-get update
@@ -39,7 +52,7 @@ jobs:
         run: |
           git clone --recursive https://github.com/XorTroll/javm-nx-poc.git
 
-      - name: Patch old libjavm
+      - name: Patch libjavm algorithm
         run: |
           sed -i '1i #include <algorithm>' \
             javm-nx-poc/libjavm/libjavm/include/javm/core/core_ClassObject.hpp
@@ -47,7 +60,7 @@ jobs:
           sed -i '1i #include <algorithm>' \
             javm-nx-poc/libjavm/libjavm/include/javm/core/core_ManifestFile.hpp
 
-      - name: Disable obsolete HID module
+      - name: Disable obsolete HID
         run: |
           sed -i '/#include.*nx\/hid\/Input.class.hpp/d' \
             javm-nx-poc/nx/native/nx_Java.hpp
@@ -55,18 +68,4 @@ jobs:
           sed -i '/NX_ADD_CLASS.*hid.*Input/d' \
             javm-nx-poc/nx/native/nx_Java.hpp
 
-      - name: Build Java VM
-        working-directory: javm-nx-poc/javm
-        run: make -j2
-
-      - name: Find generated files
-        run: |
-          find javm-nx-poc -type f \( -name "*.nro" -o -name "*.nacp" \) -print
-
-      - name: Upload Java VM
-        uses: actions/upload-artifact@v4
-        with:
-          name: Minecraft-NX-JavaVM
-          path: |
-            javm-nx-poc/**/*.nro
-            javm-nx-poc/sd_out/**
+      - name: Show patched nx_Java
