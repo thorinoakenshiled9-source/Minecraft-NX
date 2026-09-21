@@ -1,4 +1,4 @@
-name: Minecraft-NX Java Diagnostic v3.2
+name: Minecraft-NX Java Diagnostic v3.3
 
 on:
   push:
@@ -27,7 +27,7 @@ jobs:
           path: Minecraft-NX.nro
 
 
-  java-diagnostic:
+  java-test:
     runs-on: ubuntu-latest
 
     container:
@@ -53,7 +53,7 @@ jobs:
           git clone --recursive https://github.com/XorTroll/javm-nx-poc.git
 
       # ============================================================
-      # Compatibilidade com C++ atual
+      # Compatibilidade C++
       # ============================================================
 
       - name: Patch algorithm compatibility
@@ -129,7 +129,6 @@ jobs:
                               (void)controller;
 
                               EnsureInitialized();
-
                               padUpdate(&pad);
 
                               u64 keys =
@@ -156,7 +155,6 @@ jobs:
                               (void)controller;
 
                               EnsureInitialized();
-
                               padUpdate(&pad);
 
                               u64 keys =
@@ -183,7 +181,6 @@ jobs:
                               (void)controller;
 
                               EnsureInitialized();
-
                               padUpdate(&pad);
 
                               u64 keys =
@@ -202,7 +199,7 @@ jobs:
           """; p.write_text(s)'
 
       # ============================================================
-      # Confirma registro HID
+      # Confirma HID
       # ============================================================
 
       - name: Verify HID
@@ -214,13 +211,13 @@ jobs:
           grep -q "LoadNativeClass<hid::Input>" \
             javm-nx-poc/nx/native/nx_Java.hpp
 
-          echo "HID OK"
+          echo "HID moderno OK"
 
       # ============================================================
-      # Java minimo
+      # Java
       # ============================================================
 
-      - name: Create minimal Java test
+      - name: Create Java test
         shell: bash
         run: |
           MAIN_JAVA=$(find javm-nx-poc/java-hello-world/src -type f -name "Main.java" | head -n 1)
@@ -234,10 +231,56 @@ jobs:
           'package javmnx.helloworld;' \
           '' \
           'public class Main {' \
+          '' \
           '    public static void main(String[] args) {' \
+          '' \
           '        System.out.println("Minecraft-NX");' \
           '        System.out.println("Created by Farbert_Took");' \
-          '        System.out.println("[JAVA] main executado");' \
+          '        System.out.println("==========================");' \
+          '' \
+          '        System.out.println("[1] JVM OK");' \
+          '' \
+          '        String project = "Minecraft-NX";' \
+          '        System.out.println("[2] String OK");' \
+          '        System.out.println(project);' \
+          '' \
+          '        int a = 20;' \
+          '        int b = 22;' \
+          '        int result = a + b;' \
+          '' \
+          '        if(result == 42) {' \
+          '            System.out.println("[3] Inteiros OK");' \
+          '        }' \
+          '' \
+          '        int multiply = 7 * 6;' \
+          '' \
+          '        if(multiply == 42) {' \
+          '            System.out.println("[4] Multiplicacao OK");' \
+          '        }' \
+          '' \
+          '        int counter = 0;' \
+          '' \
+          '        for(int i = 0; i < 5; i++) {' \
+          '            counter = counter + 1;' \
+          '        }' \
+          '' \
+          '        if(counter == 5) {' \
+          '            System.out.println("[5] Loop OK");' \
+          '        }' \
+          '' \
+          '        int[] numbers = new int[3];' \
+          '' \
+          '        numbers[0] = 10;' \
+          '        numbers[1] = 20;' \
+          '        numbers[2] = 30;' \
+          '' \
+          '        if(numbers[1] == 20) {' \
+          '            System.out.println("[6] Array OK");' \
+          '        }' \
+          '' \
+          '        System.out.println("==========================");' \
+          '        System.out.println("[DONE] Java test concluido");' \
+          '        System.out.println("Minecraft-NX by Farbert_Took");' \
           '    }' \
           '}' \
           > "$MAIN_JAVA"
@@ -246,7 +289,7 @@ jobs:
           cat "$MAIN_JAVA"
 
       # ============================================================
-      # Biblioteca NX Java
+      # Biblioteca Java NX
       # ============================================================
 
       - name: Build nx Java library
@@ -263,26 +306,14 @@ jobs:
         run: |
           mvn clean package
 
-      - name: Show generated JAR
-        shell: bash
-        run: |
-          echo "=== JARs gerados ==="
-
-          find \
-            javm-nx-poc/java-hello-world/target \
-            -maxdepth 1 \
-            -type f \
-            -name "*.jar" \
-            -print
-
       # ============================================================
-      # Main.cpp de diagnostico
+      # Main.cpp
       #
-      # Usa o fluxo REAL do javm-nx-poc.
-      # Cada fase abre uma mensagem no Switch.
+      # Executa o JAR e NAO sai automaticamente.
+      # Depois do Java, espera o botao +.
       # ============================================================
 
-      - name: Install diagnostic Main.cpp
+      - name: Install Minecraft-NX launcher
         shell: bash
         run: |
           MAIN_CPP="javm-nx-poc/javm/source/Main.cpp"
@@ -340,6 +371,38 @@ jobs:
           }
 
 
+          void WaitForPlus() {
+
+              PadState pad;
+
+              padConfigureInput(
+                  1,
+                  HidNpadStyleSet_NpadStandard
+              );
+
+              padInitializeDefault(&pad);
+
+
+              while(appletMainLoop()) {
+
+                  padUpdate(&pad);
+
+                  u64 down =
+                      padGetButtonsDown(&pad);
+
+
+                  if(down & HidNpadButton_Plus) {
+                      break;
+                  }
+
+
+                  svcSleepThread(
+                      16'000'000
+                  );
+              }
+          }
+
+
           int main(int argc, char **argv) {
 
               static char direct_app[] =
@@ -354,95 +417,46 @@ jobs:
                   nullptr
               };
 
+
               argc = 2;
               argv = direct_argv;
 
 
-              LogMessage(
-                  "Minecraft-NX\n"
-                  "Created by Farbert_Took\n\n"
-                  "BOOT 1 - main iniciou"
-              );
-
-
-              std::string jar = argv[1];
-
-
-              LogMessage(
-                  "Minecraft-NX\n\n"
-                  "BOOT 2 - caminho do JAR definido"
-              );
+              std::string jar =
+                  argv[1];
 
 
               core::Machine machine;
 
 
-              LogMessage(
-                  "Minecraft-NX\n\n"
-                  "BOOT 3 - Machine criada"
-              );
-
-
               machine.LoadBuiltinNativeClasses();
 
 
-              LogMessage(
-                  "Minecraft-NX\n\n"
-                  "BOOT 4 - classes nativas carregadas"
-              );
-
-
               nx::LoadClasses(machine);
-
-
-              LogMessage(
-                  "Minecraft-NX\n\n"
-                  "BOOT 5 - classes NX carregadas"
-              );
 
 
               auto &jar_ref =
                   machine.LoadJavaArchive(jar);
 
 
-              LogMessage(
-                  "Minecraft-NX\n\n"
-                  "BOOT 6 - LoadJavaArchive retornou"
-              );
-
-
               if(!jar_ref->CanBeExecuted()) {
 
                   LogMessage(
-                      "Minecraft-NX\n\n"
+                      "Minecraft-NX\n"
+                      "Created by Farbert_Took\n\n"
                       "ERRO:\n"
-                      "JAR nao pode ser executado."
+                      "Nao foi possivel executar test.jar.\n\n"
+                      "Pressione + para sair."
                   );
+
+                  WaitForPlus();
 
                   return 0;
               }
 
 
-              LogMessage(
-                  "Minecraft-NX\n\n"
-                  "BOOT 7 - JAR executavel"
-              );
-
-
               auto args_array_value =
                   core::CreateArray<java::lang::String>(0);
-
-
-              LogMessage(
-                  "Minecraft-NX\n\n"
-                  "BOOT 8 - args Java criado"
-              );
-
-
-              LogMessage(
-                  "Minecraft-NX\n\n"
-                  "BOOT 9 - chamando Java main()"
-              );
 
 
               machine.CallFunction(
@@ -452,24 +466,24 @@ jobs:
               );
 
 
-              LogMessage(
-                  "Minecraft-NX\n\n"
-                  "BOOT 10 - Java main retornou"
-              );
-
-
               if(machine.WasExceptionThrown()) {
 
                   auto info =
                       machine.GetExceptionInfo();
 
+
                   LogMessage(
-                      "Minecraft-NX\n\n"
-                      "EXCEPTION:\n" +
+                      "Minecraft-NX\n"
+                      "Created by Farbert_Took\n\n"
+                      "Java exception:\n" +
                       info.class_type +
                       "\n" +
-                      info.message
+                      info.message +
+                      "\n\nPressione + para sair."
                   );
+
+
+                  WaitForPlus();
 
                   return 0;
               }
@@ -478,21 +492,26 @@ jobs:
               LogMessage(
                   "Minecraft-NX\n"
                   "Created by Farbert_Took\n\n"
-                  "DIAGNOSTICO CONCLUIDO\n"
-                  "Java terminou normalmente."
+                  "Java terminou normalmente.\n\n"
+                  "JVM: OK\n"
+                  "JAR: OK\n"
+                  "Main: OK\n\n"
+                  "Pressione + para sair."
               );
+
+
+              WaitForPlus();
 
 
               return 0;
           }
           EOF
 
-          echo ""
-          echo "=== Main.cpp de diagnostico ==="
+          echo "=== Minecraft-NX Main.cpp ==="
           cat "$MAIN_CPP"
 
       # ============================================================
-      # Compila JavaVM
+      # Build JavaVM
       # ============================================================
 
       - name: Build JavaVM
@@ -502,32 +521,7 @@ jobs:
           make -j2
 
       # ============================================================
-      # Localiza arquivos
-      # ============================================================
-
-      - name: Locate build files
-        shell: bash
-        run: |
-          echo "=== NRO ==="
-
-          find \
-            javm-nx-poc/javm \
-            -type f \
-            -name "javm.nro" \
-            -print
-
-          echo ""
-          echo "=== JAR ==="
-
-          find \
-            javm-nx-poc/java-hello-world/target \
-            -maxdepth 1 \
-            -type f \
-            -name "*.jar" \
-            -print
-
-      # ============================================================
-      # Pacote SD
+      # Pacote final
       # ============================================================
 
       - name: Prepare SD package
@@ -539,6 +533,7 @@ jobs:
 
           mkdir -p \
             SD/switch/minecraft-nx
+
 
           JAVM_NRO=$(find javm-nx-poc/javm -type f -name "javm.nro" | head -n 1)
 
@@ -555,7 +550,7 @@ jobs:
 
           if [ -z "$TEST_JAR" ]; then
 
-            echo "ERRO: JAR nao encontrado"
+            echo "ERRO: test.jar nao encontrado"
 
             exit 1
           fi
@@ -573,16 +568,14 @@ jobs:
 
           echo ""
           echo "========================================"
-          echo " Minecraft-NX Diagnostic v3.2"
+          echo " Minecraft-NX v3.3"
           echo " Created by Farbert_Took"
           echo "========================================"
-
-          echo ""
 
           find SD -type f -print
 
       # ============================================================
-      # Verificacao final
+      # Verificacao
       # ============================================================
 
       - name: Verify package
@@ -597,6 +590,7 @@ jobs:
             SD/switch/minecraft-nx/test.jar
 
 
+          echo ""
           echo "=== javm.nro ==="
 
           ls -lh \
@@ -604,7 +598,6 @@ jobs:
 
 
           echo ""
-
           echo "=== test.jar ==="
 
           ls -lh \
@@ -612,16 +605,15 @@ jobs:
 
 
           echo ""
-
-          echo "Minecraft-NX Diagnostic v3.2 pronto"
+          echo "Minecraft-NX v3.3 pronto"
           echo "Created by Farbert_Took"
 
       # ============================================================
       # Artifact
       # ============================================================
 
-      - name: Upload diagnostic
+      - name: Upload Minecraft-NX Java v3.3
         uses: actions/upload-artifact@v4
         with:
-          name: Minecraft-NX-Farbert_Took-Diagnostic-v3.2
+          name: Minecraft-NX-Farbert_Took-v3.3
           path: SD
