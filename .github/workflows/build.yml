@@ -27,8 +27,10 @@ jobs:
       # Baixa o javm-nx-poc ORIGINAL
       # ============================================================
 
-      - name: Clone original JavaVM
+            - name: Clone original JavaVM
+        shell: bash
         run: |
+          rm -rf javm-nx-poc
           git clone --recursive https://github.com/XorTroll/javm-nx-poc.git
 
       # ============================================================
