@@ -1,4 +1,4 @@
-name: OpenJDK Horizon Research v1.6
+name: OpenJDK Horizon Research v1.7
 
 on:
   workflow_dispatch:
@@ -20,23 +20,24 @@ jobs:
 
       # ============================================================
       # Minecraft-NX
-      # OpenJDK Horizon Research v1.6
+      # OpenJDK Horizon Research v1.7
       # Created by Farbert_Took
       #
-      # v1.4:
-      #   OpenJDK configure: OK
-      #   make hotspot iniciou
-      #
-      # v1.5:
-      #   identificou a estrutura real de JvmMapfile.gmk
-      #
       # v1.6:
-      #   adiciona ramo Horizon explicito em JvmMapfile.gmk
-      #   usando GNU nm para objetos ELF
+      #   configure = OK
+      #   JvmMapfile Horizon = OK
+      #   HotSpot entrou na compilacao de libjvm
       #
-      # IMPORTANTE:
-      #   Horizon continua sendo Horizon.
-      #   Nao transformamos Horizon globalmente em Linux.
+      # Primeiro erro:
+      #   globalDefinitions_gcc.hpp
+      #   fatal error: dlfcn.h: No such file or directory
+      #
+      # v1.7:
+      #   - preserva os patches conhecidos
+      #   - pesquisa dlfcn/dlopen/dlsym
+      #   - desativa apenas o include dlfcn.h para __SWITCH__
+      #   - NAO cria implementacoes falsas de dlopen/dlsym
+      #   - executa novo make hotspot
       # ============================================================
 
 
@@ -78,7 +79,7 @@ jobs:
           echo ""
           echo "========================================"
           echo " Minecraft-NX"
-          echo " OpenJDK Horizon Research v1.6"
+          echo " OpenJDK Horizon Research v1.7"
           echo " Created by Farbert_Took"
           echo "========================================"
 
@@ -113,20 +114,19 @@ jobs:
 
           {
             echo "Minecraft-NX"
-            echo "OpenJDK Horizon Research v1.6"
+            echo "OpenJDK Horizon Research v1.7"
             echo "Created by Farbert_Took"
             echo ""
             echo "Target: Nintendo Switch Horizon"
             echo "CPU: AArch64"
             echo "JVM: OpenJDK 21 HotSpot minimal"
             echo "Mode: headless"
-            echo "FreeType: static target library"
-            echo "JvmMapfile: Horizon ELF/GNU nm"
+            echo "Current research: dlfcn.h / dynamic loading"
           } > horizon-research/info.txt
 
 
       # ============================================================
-      # 4. Verifica devkitA64
+      # 4. Toolchain
       # ============================================================
 
       - name: Verify devkitA64
@@ -150,7 +150,7 @@ jobs:
 
 
       # ============================================================
-      # 5. Teste AArch64/Horizon
+      # 5. Teste Horizon
       # ============================================================
 
       - name: Verify Horizon AArch64 compilation
@@ -179,18 +179,66 @@ jobs:
           file horizon-research/horizon-test.o \
             | tee horizon-research/horizon-object.txt
 
-          echo ""
-          echo "Symbols:"
-          echo ""
 
-          aarch64-none-elf-nm \
-            --defined-only \
-            horizon-research/horizon-test.o \
-            | tee horizon-research/horizon-test-symbols.txt
+      # ============================================================
+      # 6. Pesquisa headers do devkitA64/libnx
+      # ============================================================
+
+      - name: Research Horizon dynamic loading headers
+        shell: bash
+        run: |
+          set +e
+
+          {
+            echo "========================================"
+            echo " Minecraft-NX"
+            echo " Horizon Dynamic Loading Research"
+            echo " Created by Farbert_Took"
+            echo "========================================"
+
+            echo ""
+            echo "===== dlfcn.h ====="
+            echo ""
+
+            find \
+              /opt/devkitpro \
+              -type f \
+              -name 'dlfcn.h' \
+              -print \
+              2>/dev/null
+
+            echo ""
+            echo "===== dlopen/dlsym/dlclose ====="
+            echo ""
+
+            grep \
+              -Rni \
+              -E '\b(dlopen|dlsym|dlclose|dlerror)\b' \
+              /opt/devkitpro/libnx/include \
+              /opt/devkitpro/devkitA64/aarch64-none-elf/include \
+              2>/dev/null \
+              | head -n 1000
+
+            echo ""
+            echo "===== NRO/NRO0/DYNAMIC LOADER REFERENCES ====="
+            echo ""
+
+            grep \
+              -Rni \
+              -E 'nro|Nro|NRO|dynamic.*load|loader|ro:|ldr:' \
+              /opt/devkitpro/libnx/include \
+              2>/dev/null \
+              | head -n 1500
+
+          } > horizon-research/horizon-dynamic-loading.txt
+
+          cat horizon-research/horizon-dynamic-loading.txt
+
+          exit 0
 
 
       # ============================================================
-      # 6. Boot JDK 20
+      # 7. Boot JDK
       # ============================================================
 
       - name: Download Boot JDK 20
@@ -219,7 +267,7 @@ jobs:
 
 
       # ============================================================
-      # 7. FreeType
+      # 8. FreeType source
       # ============================================================
 
       - name: Clone FreeType
@@ -240,7 +288,7 @@ jobs:
 
 
       # ============================================================
-      # 8. Configura FreeType
+      # 9. FreeType configure
       # ============================================================
 
       - name: Configure FreeType for Horizon
@@ -282,7 +330,7 @@ jobs:
 
 
       # ============================================================
-      # 9. Compila FreeType
+      # 10. FreeType build
       # ============================================================
 
       - name: Build FreeType for Horizon
@@ -317,18 +365,16 @@ jobs:
             > ../horizon-research/freetype-build-exit.txt
 
           if [ "$STATUS" = "0" ]; then
-
             ninja install \
               2>&1 \
               | tee ../horizon-research/freetype-install.log
-
           fi
 
           exit 0
 
 
       # ============================================================
-      # 10. Valida FreeType
+      # 11. FreeType validation
       # ============================================================
 
       - name: Validate Horizon FreeType
@@ -361,25 +407,16 @@ jobs:
           echo "FREETYPE_LIBDIR=$FREETYPE_LIBDIR" >> "$GITHUB_ENV"
 
           echo ""
-          echo "========================================"
-          echo " FREETYPE TARGET READY"
-          echo "========================================"
-          echo ""
-
+          echo "FreeType:"
           echo "$FREETYPE_LIB"
 
           ls -lh "$FREETYPE_LIB"
-
-          aarch64-none-elf-ar \
-            t "$FREETYPE_LIB" \
-            | head -n 50 \
-            | tee horizon-research/freetype-members.txt
 
           exit 0
 
 
       # ============================================================
-      # 11. OpenJDK 21
+      # 12. OpenJDK
       # ============================================================
 
       - name: Clone OpenJDK 21
@@ -399,7 +436,7 @@ jobs:
 
 
       # ============================================================
-      # 12. Mapeia ELF -> Horizon
+      # 13. elf -> horizon
       # ============================================================
 
       - name: Add Horizon OS mapping
@@ -465,14 +502,12 @@ jobs:
 
           p.write_text(s)
 
-          print(
-              "elf -> horizon mapping installed"
-          )
+          print("elf -> horizon mapping installed")
           PY
 
 
       # ============================================================
-      # 13. CUPS
+      # 14. CUPS
       # ============================================================
 
       - name: Apply Horizon CUPS research bypass
@@ -483,43 +518,26 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          root = Path(
-              "openjdk21/make/autoconf"
-          )
+          root = Path("openjdk21/make/autoconf")
 
           target = None
 
           for p in root.rglob("*.m4"):
 
-              text = p.read_text(
-                  errors="ignore"
-              )
+              text = p.read_text(errors="ignore")
 
               if "Could not find cups" in text:
                   target = p
                   break
 
           if target is None:
-              raise SystemExit(
-                  "CUPS check not found"
-              )
+              raise SystemExit("CUPS check not found")
 
           text = target.read_text()
 
-          pos = text.find(
-              "Could not find cups"
-          )
-
-          start = text.rfind(
-              "\n",
-              0,
-              pos
-          ) + 1
-
-          end = text.find(
-              "\n",
-              pos
-          )
+          pos = text.find("Could not find cups")
+          start = text.rfind("\n", 0, pos) + 1
+          end = text.find("\n", pos)
 
           if end < 0:
               end = len(text)
@@ -527,8 +545,7 @@ jobs:
           original = text[start:end]
 
           indent = original[
-              :len(original)
-              - len(original.lstrip())
+              :len(original) - len(original.lstrip())
           ]
 
           replacement = (
@@ -556,14 +573,12 @@ jobs:
 
           target.write_text(text)
 
-          print(
-              "Horizon CUPS bypass installed"
-          )
+          print("Horizon CUPS bypass installed")
           PY
 
 
       # ============================================================
-      # 14. Fontconfig
+      # 15. Fontconfig
       # ============================================================
 
       - name: Apply Horizon Fontconfig research bypass
@@ -574,17 +589,13 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          root = Path(
-              "openjdk21/make/autoconf"
-          )
+          root = Path("openjdk21/make/autoconf")
 
           target = None
 
           for p in root.rglob("*.m4"):
 
-              text = p.read_text(
-                  errors="ignore"
-              )
+              text = p.read_text(errors="ignore")
 
               if "Could not find fontconfig" in text:
                   target = p
@@ -654,7 +665,7 @@ jobs:
 
 
       # ============================================================
-      # 15. FreeType estatico para Horizon
+      # 16. FreeType statico
       # ============================================================
 
       - name: Add static FreeType detection for Horizon
@@ -700,7 +711,7 @@ jobs:
 
 
       # ============================================================
-      # 16. X11
+      # 17. X11
       # ============================================================
 
       - name: Apply complete Horizon headless X11 bypass
@@ -747,9 +758,7 @@ jobs:
 
               p = candidates[0]
 
-              lines = p.read_text().splitlines(
-                  True
-              )
+              lines = p.read_text().splitlines(True)
 
               indexes = []
 
@@ -763,9 +772,8 @@ jobs:
 
               if len(indexes) != 1:
                   raise SystemExit(
-                      f"{label}: expected one "
-                      f"AC_MSG_ERROR, found "
-                      f"{len(indexes)}"
+                      f"{label}: expected one AC_MSG_ERROR, "
+                      f"found {len(indexes)}"
                   )
 
               i = indexes[0]
@@ -777,24 +785,17 @@ jobs:
                   - len(original.lstrip())
               ]
 
-              original_body = (
-                  original.rstrip("\n")
-              )
+              original_body = original.rstrip("\n")
 
               if label == "X11 libraries":
-
                   warning = (
                       "X11 libraries disabled for "
-                      "experimental Horizon "
-                      "headless target"
+                      "experimental Horizon headless target"
                   )
-
               else:
-
                   warning = (
                       "X11 headers disabled for "
-                      "experimental Horizon "
-                      "headless target"
+                      "experimental Horizon headless target"
                   )
 
               replacement = (
@@ -818,40 +819,16 @@ jobs:
 
               lines[i] = replacement
 
-              p.write_text(
-                  "".join(lines)
-              )
+              p.write_text("".join(lines))
 
           print(
-              "Horizon X11 library/header bypass installed"
+              "Horizon X11 bypass installed"
           )
           PY
 
 
       # ============================================================
-      # 17. Salva patches do configure
-      # ============================================================
-
-      - name: Save configure Horizon patch
-        shell: bash
-        run: |
-          set -e
-
-          git -C openjdk21 diff \
-            > horizon-research/openjdk-horizon-configure-v1.6.patch
-
-          grep \
-            -n \
-            -C 10 \
-            -E \
-            'horizon|Horizon|FREETYPE|X11|CUPS|Fontconfig' \
-            horizon-research/openjdk-horizon-configure-v1.6.patch \
-            | head -n 1500 \
-            || true
-
-
-      # ============================================================
-      # 18. Configure OpenJDK
+      # 18. Configure
       # ============================================================
 
       - name: Configure OpenJDK Horizon
@@ -861,8 +838,8 @@ jobs:
 
           if [ "$FREETYPE_READY" != "yes" ]; then
 
-            echo "FreeType target unavailable." \
-              > horizon-research/configure-v1.6.log
+            echo "FreeType unavailable" \
+              > horizon-research/configure-v1.7.log
 
             echo "99" \
               > horizon-research/configure-exit-code.txt
@@ -889,7 +866,7 @@ jobs:
             OBJCOPY=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-objcopy \
             STRIP=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-strip \
             2>&1 \
-            | tee ../horizon-research/configure-v1.6.log
+            | tee ../horizon-research/configure-v1.7.log
 
           STATUS=${PIPESTATUS[0]}
 
@@ -900,73 +877,7 @@ jobs:
 
 
       # ============================================================
-      # 19. Resultado do configure
-      # ============================================================
-
-      - name: Show configure result
-        shell: bash
-        run: |
-          set -e
-
-          echo ""
-          echo "========================================"
-          echo " CONFIGURE RESULT v1.6"
-          echo "========================================"
-          echo ""
-
-          STATUS=$(
-            cat horizon-research/configure-exit-code.txt
-          )
-
-          echo "Configure exit:"
-          echo "$STATUS"
-
-          echo ""
-
-          grep -i -E \
-            'error|warning|horizon|aarch64|headless|minimal|freetype|x11|cups|fontconfig|dlopen' \
-            horizon-research/configure-v1.6.log \
-            | tail -n 1000 \
-            || true
-
-
-      # ============================================================
-      # 20. Inspeciona JvmMapfile real
-      # ============================================================
-
-      - name: Inspect JvmMapfile before Horizon patch
-        shell: bash
-        run: |
-          set -e
-
-          JVMMAPFILE="openjdk21/make/hotspot/lib/JvmMapfile.gmk"
-
-          test -f "$JVMMAPFILE"
-
-          echo ""
-          echo "========================================"
-          echo " JVMMAPFILE BEFORE v1.6"
-          echo "========================================"
-          echo ""
-
-          nl -ba "$JVMMAPFILE" \
-            | tee horizon-research/JvmMapfile-before-v1.6.txt
-
-          echo ""
-          echo "Linux branch:"
-          echo ""
-
-          grep \
-            -n \
-            -A 25 \
-            -B 5 \
-            'isTargetOs, linux' \
-            "$JVMMAPFILE" \
-            | tee horizon-research/JvmMapfile-linux-v1.6.txt
-
-
-      # ============================================================
-      # 21. JvmMapfile Horizon ELF/GNU nm
+      # 19. JvmMapfile Horizon
       # ============================================================
 
       - name: Add Horizon support to JvmMapfile
@@ -988,23 +899,27 @@ jobs:
 
           s = p.read_text()
 
-          linux_marker = '''ifeq ($(call isTargetOs, linux), true)'''
+          linux_marker = (
+              'ifeq ($(call isTargetOs, linux), true)'
+          )
 
-          mac_marker = '''else ifeq ($(call isTargetOs, macosx), true)'''
+          mac_marker = (
+              'else ifeq ($(call isTargetOs, macosx), true)'
+          )
 
           if linux_marker not in s:
               raise SystemExit(
-                  "Linux JvmMapfile branch not found"
+                  "Linux branch not found"
               )
 
           if mac_marker not in s:
               raise SystemExit(
-                  "macOS JvmMapfile branch not found"
+                  "macOS branch not found"
               )
 
           if "isTargetOs, horizon" in s:
               raise SystemExit(
-                  "Horizon JvmMapfile branch already exists"
+                  "Horizon branch already exists"
               )
 
           horizon_branch = r'''else ifeq ($(call isTargetOs, horizon), true)
@@ -1014,7 +929,6 @@ jobs:
             # by the devkitA64 GNU toolchain.
             #
             # This branch only controls HotSpot symbol extraction.
-            # Horizon remains a distinct target OS.
             DUMP_SYMBOLS_CMD := $(NM) $(NMFLAGS) --defined-only *$(OBJ_SUFFIX)
             ifneq ($(FILTER_SYMBOLS_PATTERN), )
               FILTER_SYMBOLS_PATTERN := $(FILTER_SYMBOLS_PATTERN)|
@@ -1036,73 +950,177 @@ jobs:
 
           p.write_text(s)
 
-          print("")
-          print("========================================")
-          print(" JVMMAPFILE HORIZON PATCH INSTALLED")
-          print("========================================")
-          print("")
-          print("Target OS: horizon")
-          print("Object format: ELF")
-          print("Symbol extraction: GNU nm")
-          print("")
+          print(
+              "JvmMapfile Horizon ELF branch installed"
+          )
           PY
-
-          echo ""
-          echo "===== JVMMAPFILE PATCH ====="
-          echo ""
 
           git -C openjdk21 diff \
             -- make/hotspot/lib/JvmMapfile.gmk \
-            | tee horizon-research/JvmMapfile-patch-v1.6.diff
-
-          echo ""
-          echo "===== HORIZON BRANCH ====="
-          echo ""
-
-          grep \
-            -n \
-            -A 30 \
-            -B 10 \
-            'isTargetOs, horizon' \
-            openjdk21/make/hotspot/lib/JvmMapfile.gmk \
-            | tee horizon-research/JvmMapfile-horizon-v1.6.txt
-
-          echo ""
-          echo "JvmMapfile Horizon patch: OK"
+            | tee horizon-research/JvmMapfile-patch-v1.7.diff
 
 
       # ============================================================
-      # 22. Valida JvmMapfile
+      # 20. Pesquisa dlfcn dentro do OpenJDK
       # ============================================================
 
-      - name: Validate JvmMapfile Horizon patch
+      - name: Research OpenJDK dlfcn usage
+        shell: bash
+        run: |
+          set +e
+
+          {
+            echo "========================================"
+            echo " Minecraft-NX"
+            echo " OpenJDK dlfcn Research v1.7"
+            echo " Created by Farbert_Took"
+            echo "========================================"
+
+            echo ""
+            echo "===== globalDefinitions_gcc.hpp ====="
+            echo ""
+
+            nl -ba \
+              openjdk21/src/hotspot/share/utilities/globalDefinitions_gcc.hpp \
+              | head -n 160
+
+            echo ""
+            echo "===== #include dlfcn.h ====="
+            echo ""
+
+            grep \
+              -Rni \
+              '#include.*dlfcn\.h' \
+              openjdk21/src/hotspot \
+              2>/dev/null \
+              | head -n 1000
+
+            echo ""
+            echo "===== dlopen/dlsym/dlclose/dlerror ====="
+            echo ""
+
+            grep \
+              -Rni \
+              -E '\b(dlopen|dlsym|dlclose|dlerror)\b' \
+              openjdk21/src/hotspot \
+              2>/dev/null \
+              | head -n 4000
+
+            echo ""
+            echo "===== RTLD ====="
+            echo ""
+
+            grep \
+              -Rni \
+              -E '\bRTLD_[A-Za-z0-9_]+' \
+              openjdk21/src/hotspot \
+              2>/dev/null \
+              | head -n 4000
+
+          } > horizon-research/openjdk-dlfcn-research-v1.7.txt
+
+          cat \
+            horizon-research/openjdk-dlfcn-research-v1.7.txt
+
+          exit 0
+
+
+      # ============================================================
+      # 21. Patch SOMENTE do include dlfcn.h
+      #
+      # Nao implementamos dlopen/dlsym.
+      # Apenas removemos o bloqueio global do header para descobrir
+      # onde a API e realmente necessaria.
+      # ============================================================
+
+      - name: Isolate dlfcn include for Horizon
         shell: bash
         run: |
           set -e
 
-          FILE="openjdk21/make/hotspot/lib/JvmMapfile.gmk"
+          python3 - <<'PY'
+          from pathlib import Path
 
-          grep -q \
-            'isTargetOs, horizon' \
-            "$FILE"
+          p = Path(
+              "openjdk21/src/hotspot/share/"
+              "utilities/globalDefinitions_gcc.hpp"
+          )
 
-          grep -q \
-            'DUMP_SYMBOLS_CMD := $(NM) $(NMFLAGS) --defined-only' \
-            "$FILE"
+          if not p.exists():
+              raise SystemExit(
+                  "globalDefinitions_gcc.hpp not found"
+              )
 
-          grep -q \
-            'Unknown target OS' \
-            "$FILE"
+          s = p.read_text()
 
-          echo ""
-          echo "JvmMapfile validation: OK"
-          echo ""
-          echo "Horizon has its own symbol branch."
-          echo "Unknown-OS protection remains intact."
+          old = "#include <dlfcn.h>"
+
+          if s.count(old) != 1:
+              raise SystemExit(
+                  f"Expected exactly one dlfcn include, "
+                  f"found {s.count(old)}"
+              )
+
+          new = '''// Minecraft-NX / Horizon:
+          // Horizon/libnx does not provide the POSIX dlfcn.h API.
+          // Do not include it globally for Switch builds.
+          // Actual dynamic-loader usages are handled separately.
+          #if !defined(__SWITCH__)
+          #include <dlfcn.h>
+          #endif'''
+
+          s = s.replace(
+              old,
+              new,
+              1
+          )
+
+          p.write_text(s)
+
+          print("")
+          print("========================================")
+          print(" DLFCN INCLUDE ISOLATED FOR HORIZON")
+          print("========================================")
+          print("")
+          print("No fake dlopen/dlsym implementation added.")
+          print("")
+          PY
+
+          git -C openjdk21 diff \
+            -- src/hotspot/share/utilities/globalDefinitions_gcc.hpp \
+            | tee horizon-research/dlfcn-include-patch-v1.7.diff
 
 
       # ============================================================
-      # 23. Salva patch completo
+      # 22. Verifica __SWITCH__
+      # ============================================================
+
+      - name: Verify Switch preprocessor macro
+        shell: bash
+        run: |
+          set +e
+
+          {
+            echo "========================================"
+            echo " __SWITCH__ CHECK"
+            echo "========================================"
+            echo ""
+
+            echo | \
+              aarch64-none-elf-g++ \
+              -D__SWITCH__ \
+              -dM \
+              -E \
+              -x c++ - \
+              | grep -E '__SWITCH__|__aarch64__'
+
+          } | tee horizon-research/switch-macros-v1.7.txt
+
+          exit 0
+
+
+      # ============================================================
+      # 23. Patch completo
       # ============================================================
 
       - name: Save complete Horizon patch
@@ -1111,33 +1129,33 @@ jobs:
           set -e
 
           git -C openjdk21 diff \
-            > horizon-research/openjdk-horizon-v1.6.patch
+            > horizon-research/openjdk-horizon-v1.7.patch
 
           echo ""
-          echo "Patch size:"
+          echo "Patch lines:"
           echo ""
 
           wc -l \
-            horizon-research/openjdk-horizon-v1.6.patch
+            horizon-research/openjdk-horizon-v1.7.patch
 
           echo ""
-          echo "Horizon references:"
+          echo "Horizon/dlfcn changes:"
           echo ""
 
           grep \
             -n \
             -i \
-            'horizon' \
-            horizon-research/openjdk-horizon-v1.6.patch \
-            | head -n 1000 \
+            -E 'horizon|switch|dlfcn' \
+            horizon-research/openjdk-horizon-v1.7.patch \
+            | head -n 2000 \
             || true
 
 
       # ============================================================
-      # 24. HotSpot probe
+      # 24. HOTSPOT PROBE
       # ============================================================
 
-      - name: Probe HotSpot build v1.6
+      - name: Probe HotSpot build v1.7
         shell: bash
         run: |
           set +e
@@ -1151,21 +1169,19 @@ jobs:
             {
               echo "========================================"
               echo " Minecraft-NX"
-              echo " HOTSPOT PROBE v1.6"
+              echo " HOTSPOT PROBE v1.7"
               echo " Created by Farbert_Took"
               echo "========================================"
-
               echo ""
               echo "NOT STARTED"
-
               echo ""
               echo "Configure exit:"
               echo "$CONFIG_STATUS"
 
-            } > horizon-research/hotspot-summary-v1.6.txt
+            } > horizon-research/hotspot-summary-v1.7.txt
 
             cat \
-              horizon-research/hotspot-summary-v1.6.txt
+              horizon-research/hotspot-summary-v1.7.txt
 
             exit 0
           fi
@@ -1175,13 +1191,13 @@ jobs:
           echo ""
           echo "========================================"
           echo " OPENJDK CONFIGURE = 0"
-          echo " STARTING HOTSPOT PROBE v1.6"
+          echo " STARTING HOTSPOT PROBE v1.7"
           echo "========================================"
           echo ""
 
           make hotspot \
             2>&1 \
-            | tee ../horizon-research/hotspot-build-v1.6.log
+            | tee ../horizon-research/hotspot-build-v1.7.log
 
           STATUS=${PIPESTATUS[0]}
 
@@ -1191,7 +1207,7 @@ jobs:
           {
             echo "========================================"
             echo " Minecraft-NX"
-            echo " HOTSPOT PROBE v1.6"
+            echo " HOTSPOT PROBE v1.7"
             echo " Created by Farbert_Took"
             echo "========================================"
 
@@ -1203,30 +1219,32 @@ jobs:
             echo "Relevant messages:"
             echo ""
 
-            grep -i -E \
-              'error|fatal|horizon|aarch64|os_cpu|os/|not found|no rule|undefined|unsupported|missing|posix|linux|pthread|signal|mmap|munmap|dlopen|dlsym|clock|gettimeofday|thread|socket|atomic|errno|mapfile|JvmMapfile' \
-              ../horizon-research/hotspot-build-v1.6.log \
-              | tail -n 8000 \
+            grep \
+              -i \
+              -E \
+              'error|fatal|horizon|switch|aarch64|dlfcn|dlopen|dlsym|dlclose|dlerror|RTLD|os_cpu|os/|not found|no rule|undefined|unsupported|missing|posix|linux|pthread|signal|mmap|munmap|mprotect|clock|gettimeofday|thread|socket|atomic|errno|mapfile' \
+              ../horizon-research/hotspot-build-v1.7.log \
+              | tail -n 10000 \
               || true
 
             echo ""
-            echo "===== LAST 2000 ====="
+            echo "===== LAST 2500 ====="
             echo ""
 
             tail \
-              -n 2000 \
-              ../horizon-research/hotspot-build-v1.6.log
+              -n 2500 \
+              ../horizon-research/hotspot-build-v1.7.log
 
-          } > ../horizon-research/hotspot-summary-v1.6.txt
+          } > ../horizon-research/hotspot-summary-v1.7.txt
 
           cat \
-            ../horizon-research/hotspot-summary-v1.6.txt
+            ../horizon-research/hotspot-summary-v1.7.txt
 
           exit 0
 
 
       # ============================================================
-      # 25. Extrai primeiro erro
+      # 25. Primeiro erro
       # ============================================================
 
       - name: Extract first HotSpot failure
@@ -1234,20 +1252,18 @@ jobs:
         run: |
           set +e
 
-          LOG="horizon-research/hotspot-build-v1.6.log"
+          LOG="horizon-research/hotspot-build-v1.7.log"
 
           {
             echo "========================================"
             echo " Minecraft-NX"
-            echo " FIRST HOTSPOT FAILURE v1.6"
+            echo " FIRST HOTSPOT FAILURE v1.7"
             echo " Created by Farbert_Took"
             echo "========================================"
             echo ""
 
             if [ ! -f "$LOG" ]; then
-
               echo "HotSpot log not available."
-
               exit 0
             fi
 
@@ -1256,38 +1272,83 @@ jobs:
 
             grep \
               -n \
-              -m 80 \
+              -m 120 \
               -E \
               '(^|[^A-Za-z])(error:|fatal error:|Error [0-9]|undefined reference|No such file|No rule to make target|Unknown target|unsupported|Unsupported)' \
               "$LOG" \
               || true
 
             echo ""
-            echo "===== FIRST HORIZON REFERENCES ====="
+            echo "===== DLFCN / LOADER ====="
             echo ""
 
             grep \
               -n \
-              -m 100 \
-              -i \
+              -m 500 \
               -E \
-              'horizon|os_cpu|src/hotspot/os/' \
+              'dlfcn|dlopen|dlsym|dlclose|dlerror|RTLD_' \
               "$LOG" \
               || true
 
-          } > horizon-research/first-hotspot-failure-v1.6.txt
+            echo ""
+            echo "===== HORIZON / OS ====="
+            echo ""
+
+            grep \
+              -n \
+              -m 500 \
+              -i \
+              -E \
+              'horizon|switch|os_cpu|src/hotspot/os/' \
+              "$LOG" \
+              || true
+
+          } > horizon-research/first-hotspot-failure-v1.7.txt
 
           cat \
-            horizon-research/first-hotspot-failure-v1.6.txt
+            horizon-research/first-hotspot-failure-v1.7.txt
 
           exit 0
 
 
       # ============================================================
-      # 26. HotSpot OS source map
+      # 26. Failure command lines
       # ============================================================
 
-      - name: Create HotSpot OS source map
+      - name: Collect HotSpot failure command lines
+        shell: bash
+        run: |
+          set +e
+
+          ROOT="openjdk21/build/horizon-aarch64-minimal-release/make-support/failure-logs"
+
+          mkdir -p \
+            horizon-research/failure-logs
+
+          if [ -d "$ROOT" ]; then
+
+            find "$ROOT" \
+              -type f \
+              -maxdepth 2 \
+              -print \
+              | tee horizon-research/failure-log-files-v1.7.txt
+
+            cp -R \
+              "$ROOT"/. \
+              horizon-research/failure-logs/ \
+              2>/dev/null \
+              || true
+
+          fi
+
+          exit 0
+
+
+      # ============================================================
+      # 27. Procura headers que provavelmente serao proximos
+      # ============================================================
+
+      - name: Research Horizon missing POSIX headers
         shell: bash
         run: |
           set +e
@@ -1295,212 +1356,56 @@ jobs:
           {
             echo "========================================"
             echo " Minecraft-NX"
-            echo " HotSpot Horizon Source Map v1.6"
+            echo " POSIX Header Research v1.7"
             echo " Created by Farbert_Took"
             echo "========================================"
 
-            echo ""
-            echo "===== AARCH64 CPU ====="
-            echo ""
+            for HEADER in \
+              dlfcn.h \
+              pthread.h \
+              signal.h \
+              sys/mman.h \
+              sys/socket.h \
+              sys/time.h \
+              unistd.h \
+              fcntl.h \
+              dirent.h
+            do
 
-            find \
-              openjdk21/src/hotspot/cpu/aarch64 \
-              -maxdepth 1 \
-              -type f \
-              -print \
-              2>/dev/null \
-              | sort
+              echo ""
+              echo "===== $HEADER ====="
 
-            echo ""
-            echo "===== OS DIRECTORIES ====="
-            echo ""
+              FOUND=$(
+                find \
+                  /opt/devkitpro/devkitA64/aarch64-none-elf/include \
+                  /opt/devkitpro/libnx/include \
+                  -path "*/$HEADER" \
+                  -print \
+                  2>/dev/null \
+                  | head -n 20
+              )
 
-            find \
-              openjdk21/src/hotspot/os \
-              -mindepth 1 \
-              -maxdepth 1 \
-              -type d \
-              -print \
-              2>/dev/null \
-              | sort
+              if [ -n "$FOUND" ]; then
+                echo "$FOUND"
+              else
+                echo "NOT FOUND"
+              fi
 
-            echo ""
-            echo "===== OS_CPU DIRECTORIES ====="
-            echo ""
+            done
 
-            find \
-              openjdk21/src/hotspot/os_cpu \
-              -mindepth 1 \
-              -maxdepth 1 \
-              -type d \
-              -print \
-              2>/dev/null \
-              | sort
+          } > horizon-research/posix-header-research-v1.7.txt
 
-            echo ""
-            echo "===== LINUX REFERENCE ====="
-            echo ""
-
-            find \
-              openjdk21/src/hotspot/os/linux \
-              openjdk21/src/hotspot/os_cpu/linux_aarch64 \
-              -maxdepth 1 \
-              -type f \
-              -print \
-              2>/dev/null \
-              | sort
-
-            echo ""
-            echo "===== HORIZON CURRENT ====="
-            echo ""
-
-            find \
-              openjdk21/src/hotspot/os/horizon \
-              openjdk21/src/hotspot/os_cpu/horizon_aarch64 \
-              -type f \
-              -print \
-              2>/dev/null \
-              | sort
-
-          } > horizon-research/hotspot-source-map-v1.6.txt
+          cat \
+            horizon-research/posix-header-research-v1.7.txt
 
           exit 0
 
 
       # ============================================================
-      # 27. Procura seletores adicionais de OS
+      # 28. Summary
       # ============================================================
 
-      - name: Research next HotSpot OS selectors
-        shell: bash
-        run: |
-          set +e
-
-          {
-            echo "========================================"
-            echo " Minecraft-NX"
-            echo " HotSpot OS Selector Research v1.6"
-            echo " Created by Farbert_Took"
-            echo "========================================"
-
-            echo ""
-            echo "===== UNKNOWN / UNSUPPORTED OS ====="
-            echo ""
-
-            grep \
-              -Rni \
-              -E \
-              'Unknown target OS|Unsupported target OS|unsupported.*TARGET_OS' \
-              openjdk21/make \
-              2>/dev/null \
-              | head -n 5000
-
-            echo ""
-            echo "===== OPENJDK_TARGET_OS ====="
-            echo ""
-
-            grep \
-              -Rni \
-              'OPENJDK_TARGET_OS' \
-              openjdk21/make/hotspot \
-              2>/dev/null \
-              | head -n 5000
-
-            echo ""
-            echo "===== isTargetOs ====="
-            echo ""
-
-            grep \
-              -Rni \
-              'isTargetOs' \
-              openjdk21/make/hotspot \
-              2>/dev/null \
-              | head -n 5000
-
-            echo ""
-            echo "===== OS SOURCE PATHS ====="
-            echo ""
-
-            grep \
-              -Rni \
-              -E \
-              'src/hotspot/os/|src/hotspot/os_cpu/' \
-              openjdk21/make/hotspot \
-              2>/dev/null \
-              | head -n 5000
-
-          } > horizon-research/hotspot-os-selectors-v1.6.txt
-
-          exit 0
-
-
-      # ============================================================
-      # 28. Pesquisa POSIX/Linux sem modificar
-      # ============================================================
-
-      - name: Research future Horizon portability requirements
-        shell: bash
-        run: |
-          set +e
-
-          {
-            echo "========================================"
-            echo " Minecraft-NX"
-            echo " Horizon Portability Research v1.6"
-            echo " Created by Farbert_Took"
-            echo "========================================"
-
-            echo ""
-            echo "This step does NOT patch these APIs."
-            echo ""
-
-            echo "===== LINUX AARCH64 OS_CPU FILES ====="
-            echo ""
-
-            find \
-              openjdk21/src/hotspot/os_cpu/linux_aarch64 \
-              -maxdepth 1 \
-              -type f \
-              -print \
-              2>/dev/null \
-              | sort
-
-            echo ""
-            echo "===== LINUX OS FILES ====="
-            echo ""
-
-            find \
-              openjdk21/src/hotspot/os/linux \
-              -maxdepth 1 \
-              -type f \
-              -print \
-              2>/dev/null \
-              | sort
-
-            echo ""
-            echo "===== POSIX REFERENCES ====="
-            echo ""
-
-            grep \
-              -Rni \
-              -E \
-              'pthread_|mmap|munmap|mprotect|sigaction|sigaltstack|dlopen|dlsym|clock_gettime|gettimeofday' \
-              openjdk21/src/hotspot/os/linux \
-              openjdk21/src/hotspot/os/posix \
-              openjdk21/src/hotspot/os_cpu/linux_aarch64 \
-              2>/dev/null \
-              | head -n 5000
-
-          } > horizon-research/horizon-portability-v1.6.txt
-
-          exit 0
-
-
-      # ============================================================
-      # 29. Summary
-      # ============================================================
-
-      - name: Final v1.6 summary
+      - name: Final v1.7 summary
         shell: bash
         run: |
           set -e
@@ -1508,7 +1413,7 @@ jobs:
           {
             echo "========================================"
             echo " Minecraft-NX"
-            echo " OpenJDK Horizon Research v1.6"
+            echo " OpenJDK Horizon Research v1.7"
             echo " Created by Farbert_Took"
             echo "========================================"
 
@@ -1537,6 +1442,14 @@ jobs:
             echo "Horizon ELF/GNU nm branch installed"
 
             echo ""
+            echo "dlfcn.h:"
+            echo "global include isolated for __SWITCH__"
+
+            echo ""
+            echo "Fake dlopen/dlsym:"
+            echo "NO"
+
+            echo ""
 
             if [ -f horizon-research/hotspot-exit-code.txt ]; then
 
@@ -1554,38 +1467,38 @@ jobs:
             echo "===== FIRST FAILURE ====="
             echo ""
 
-            if [ -f horizon-research/first-hotspot-failure-v1.6.txt ]; then
+            if [ -f horizon-research/first-hotspot-failure-v1.7.txt ]; then
 
               cat \
-                horizon-research/first-hotspot-failure-v1.6.txt
+                horizon-research/first-hotspot-failure-v1.7.txt
 
             fi
 
             echo ""
-            echo "===== HOTSPOT LAST 800 ====="
+            echo "===== HOTSPOT LAST 1000 ====="
             echo ""
 
-            if [ -f horizon-research/hotspot-build-v1.6.log ]; then
+            if [ -f horizon-research/hotspot-build-v1.7.log ]; then
 
               tail \
-                -n 800 \
-                horizon-research/hotspot-build-v1.6.log
+                -n 1000 \
+                horizon-research/hotspot-build-v1.7.log
 
             fi
 
-          } > horizon-research/summary-v1.6.txt
+          } > horizon-research/summary-v1.7.txt
 
           echo ""
           echo "========================================"
-          echo " SUMMARY v1.6"
+          echo " SUMMARY v1.7"
           echo "========================================"
           echo ""
 
-          cat horizon-research/summary-v1.6.txt
+          cat horizon-research/summary-v1.7.txt
 
 
       # ============================================================
-      # 30. Coleta config logs
+      # 29. Config logs
       # ============================================================
 
       - name: Collect OpenJDK config logs
@@ -1625,7 +1538,7 @@ jobs:
 
 
       # ============================================================
-      # 31. Final report
+      # 30. Final report
       # ============================================================
 
       - name: Final report
@@ -1636,7 +1549,7 @@ jobs:
           echo ""
           echo "========================================"
           echo " Minecraft-NX"
-          echo " OpenJDK Horizon Research v1.6"
+          echo " OpenJDK Horizon Research v1.7"
           echo " Created by Farbert_Took"
           echo "========================================"
 
@@ -1665,23 +1578,22 @@ jobs:
 
           echo ""
           echo "========================================"
-          echo " STATUS v1.6"
+          echo " STATUS v1.7"
           echo "========================================"
           echo ""
-          echo "OpenJDK configure: pesquisado"
-          echo "JvmMapfile Horizon: patch aplicado"
-          echo "HotSpot: probe executado se configure = 0"
+          echo "dlfcn.h global include:"
+          echo "isolated for Horizon"
           echo ""
-          echo "Este workflow ainda e pesquisa de port."
-          echo "Ele nao produz uma JVM Horizon funcional automaticamente."
+          echo "No dynamic-loader compatibility layer"
+          echo "has been invented in this workflow."
 
 
       # ============================================================
-      # 32. Artifact
+      # 31. Artifact
       # ============================================================
 
-      - name: Upload Horizon Research v1.6
+      - name: Upload Horizon Research v1.7
         uses: actions/upload-artifact@v4
         with:
-          name: Minecraft-NX-Farbert_Took-OpenJDK-Horizon-v1.6
+          name: Minecraft-NX-Farbert_Took-OpenJDK-Horizon-v1.7
           path: horizon-research
