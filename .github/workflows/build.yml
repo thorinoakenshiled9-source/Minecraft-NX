@@ -1,4 +1,4 @@
-name: Build Minecraft-NX Java Direct Test
+name: Build Minecraft-NX Java HID Test
 
 on:
   push:
@@ -26,7 +26,7 @@ jobs:
           name: Minecraft-NX-nro
           path: Minecraft-NX.nro
 
-  java-direct-test:
+  java-hid-test:
     runs-on: ubuntu-latest
 
     container:
@@ -42,10 +42,166 @@ jobs:
         run: |
           git clone --recursive https://github.com/XorTroll/javm-nx-poc.git
 
-      - name: Patch JavaVM compatibility
+      - name: Patch C++ compatibility
         shell: bash
         run: |
-          python3 -c 'from pathlib import Path; root=Path("javm-nx-poc"); files=[root/"libjavm/libjavm/include/javm/core/core_ClassObject.hpp",root/"libjavm/libjavm/include/javm/core/core_ManifestFile.hpp"]; [(p.write_text(("#include <algorithm>\n" if "#include <algorithm>" not in p.read_text() else "")+p.read_text())) for p in files]; p=root/"nx/native/nx_Java.hpp"; s=p.read_text(); p.write_text("\n".join(line for line in s.splitlines() if "Input.class.hpp" not in line and "LoadNativeClass<hid::Input>" not in line)+"\n")'
+          python3 <<'PY'
+          from pathlib import Path
+
+          files = [
+              Path("javm-nx-poc/libjavm/libjavm/include/javm/core/core_ClassObject.hpp"),
+              Path("javm-nx-poc/libjavm/libjavm/include/javm/core/core_ManifestFile.hpp")
+          ]
+
+          for p in files:
+              s = p.read_text()
+
+              if "#include <algorithm>" not in s:
+                  s = "#include <algorithm>\n" + s
+
+              p.write_text(s)
+          PY
+
+      - name: Port nx hid Input to modern libnx
+        shell: bash
+        run: |
+          cat > javm-nx-poc/nx/native/nx/hid/Input.class.hpp <<'EOF'
+          #pragma once
+
+          #include <nx_Include.hpp>
+          #include <switch.h>
+
+          namespace nx::hid {
+
+              class Input : public native::Class {
+
+                  private:
+                      inline static PadState pad;
+                      inline static bool initialized = false;
+
+                      static void EnsureInitialized() {
+                          if(!initialized) {
+                              padConfigureInput(
+                                  1,
+                                  HidNpadStyleSet_NpadStandard
+                              );
+
+                              padInitializeDefault(&pad);
+
+                              initialized = true;
+                          }
+                      }
+
+                  public:
+                      JAVM_NATIVE_CLASS_CTOR(Input) {
+
+                          JAVM_NATIVE_CLASS_NAME("nx.hid.Input")
+
+                          JAVM_NATIVE_CLASS_REGISTER_STATIC_FN(getDownInput)
+                          JAVM_NATIVE_CLASS_REGISTER_STATIC_FN(getUpInput)
+                          JAVM_NATIVE_CLASS_REGISTER_STATIC_FN(getHeldInput)
+                      }
+
+                      core::Value getDownInput(
+                          core::Frame &frame,
+                          std::vector<core::FunctionParameter> parameters
+                      ) {
+                          if(parameters.size() > 0) {
+
+                              // Mantemos o parametro controller para
+                              // compatibilidade com a API Java original.
+                              auto controller =
+                                  parameters[0].value->Get<long>();
+
+                              (void)controller;
+
+                              EnsureInitialized();
+
+                              padUpdate(&pad);
+
+                              u64 keys =
+                                  padGetButtonsDown(&pad);
+
+                              return core::CreateNewValue<long>(
+                                  static_cast<long>(keys)
+                              );
+                          }
+
+                          JAVM_NATIVE_CLASS_NO_RETURN
+                      }
+
+                      core::Value getUpInput(
+                          core::Frame &frame,
+                          std::vector<core::FunctionParameter> parameters
+                      ) {
+                          if(parameters.size() > 0) {
+
+                              auto controller =
+                                  parameters[0].value->Get<long>();
+
+                              (void)controller;
+
+                              EnsureInitialized();
+
+                              padUpdate(&pad);
+
+                              u64 keys =
+                                  padGetButtonsUp(&pad);
+
+                              return core::CreateNewValue<long>(
+                                  static_cast<long>(keys)
+                              );
+                          }
+
+                          JAVM_NATIVE_CLASS_NO_RETURN
+                      }
+
+                      core::Value getHeldInput(
+                          core::Frame &frame,
+                          std::vector<core::FunctionParameter> parameters
+                      ) {
+                          if(parameters.size() > 0) {
+
+                              auto controller =
+                                  parameters[0].value->Get<long>();
+
+                              (void)controller;
+
+                              EnsureInitialized();
+
+                              padUpdate(&pad);
+
+                              u64 keys =
+                                  padGetButtons(&pad);
+
+                              return core::CreateNewValue<long>(
+                                  static_cast<long>(keys)
+                              );
+                          }
+
+                          JAVM_NATIVE_CLASS_NO_RETURN
+                      }
+              };
+
+          }
+          EOF
+
+      - name: Verify HID patch
+        run: |
+          echo "=== Input.class.hpp ==="
+          cat javm-nx-poc/nx/native/nx/hid/Input.class.hpp
+
+          echo ""
+          echo "=== nx_Java.hpp ==="
+          cat javm-nx-poc/nx/native/nx_Java.hpp
+
+          grep -q 'Input.class.hpp' \
+            javm-nx-poc/nx/native/nx_Java.hpp
+
+          grep -q 'LoadNativeClass<hid::Input>' \
+            javm-nx-poc/nx/native/nx_Java.hpp
+
+          echo "HID registrado."
 
       - name: Patch direct JAR launch
         shell: bash
@@ -53,111 +209,5 @@ jobs:
           python3 <<'PY'
           from pathlib import Path
 
-          p = Path("javm-nx-poc/javm/source/Main.cpp")
-          s = p.read_text()
-
-          print("=== ORIGINAL ===")
-          print(s)
-
-          marker = "int main(int argc, char **argv)"
-
-          if marker not in s:
-              marker = "int main(int argc, char *argv[])"
-
-          if marker not in s:
-              print("ERRO: assinatura main nao encontrada")
-              raise SystemExit(1)
-
-          start = s.index(marker)
-          brace = s.index("{", start) + 1
-
-          patch = r'''
-
-              // Minecraft-NX direct Java test
-              static char direct_jar[] = "sdmc:/switch/java-hello-world.jar";
-              static char direct_app[] = "javm.nro";
-              static char *direct_argv[] = {
-                  direct_app,
-                  direct_jar,
-                  nullptr
-              };
-
-              argc = 2;
-              argv = direct_argv;
-
-          '''
-
-          s = s[:brace] + patch + s[brace:]
-
-          p.write_text(s)
-
-          print("=== PATCHED ===")
-          print(p.read_text())
-          PY
-
-      - name: Build JavaVM
-        working-directory: javm-nx-poc/javm
-        run: make -j2
-
-      - name: Build nx Java library
-        working-directory: javm-nx-poc/nx/java
-        run: mvn package
-
-      - name: Build Java Hello World
-        working-directory: javm-nx-poc/java-hello-world
-        run: mvn package
-
-      - name: Prepare SD package
-        shell: bash
-        run: |
-          set -e
-
-          rm -rf SD
-          mkdir -p SD
-
-          cp -r javm-nx-poc/sd_out/. SD/
-
-          mkdir -p SD/switch/javm
-
-          JAVM_NRO=$(find javm-nx-poc/javm -type f -name "javm.nro" | head -n 1)
-
-          if [ -z "$JAVM_NRO" ]; then
-            echo "ERRO: javm.nro nao encontrado"
-            exit 1
-          fi
-
-          cp "$JAVM_NRO" SD/switch/javm/javm.nro
-
-          HELLO_JAR=$(find javm-nx-poc/java-hello-world/target -maxdepth 1 -type f -name "*.jar" | head -n 1)
-
-          if [ -z "$HELLO_JAR" ]; then
-            echo "ERRO: Hello World JAR nao encontrado"
-            exit 1
-          fi
-
-          cp "$HELLO_JAR" SD/switch/java-hello-world.jar
-
-          echo "=== PACOTE ==="
-          find SD -type f -print
-
-      - name: Verify package
-        shell: bash
-        run: |
-          set -e
-
-          test -f SD/switch/javm/javm.nro
-          test -f SD/switch/java-hello-world.jar
-
-          echo "=== JAVM ==="
-          ls -lh SD/switch/javm/javm.nro
-
-          echo "=== HELLO WORLD ==="
-          ls -lh SD/switch/java-hello-world.jar
-
-          echo "PACOTE OK"
-
-      - name: Upload direct test
-        uses: actions/upload-artifact@v4
-        with:
-          name: Minecraft-NX-Java-Direct-Test
-          path: SD
+          p = Path(
+              "javm-nx-poc/j
