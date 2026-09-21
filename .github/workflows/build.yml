@@ -1,4 +1,4 @@
-name: Minecraft-NX Java Diagnostic v3.3
+name: Minecraft-NX Native JVM Bridge v3.4
 
 on:
   push:
@@ -27,7 +27,7 @@ jobs:
           path: Minecraft-NX.nro
 
 
-  java-test:
+  java-bridge:
     runs-on: ubuntu-latest
 
     container:
@@ -62,10 +62,10 @@ jobs:
           python3 -c 'from pathlib import Path; files=[Path("javm-nx-poc/libjavm/libjavm/include/javm/core/core_ClassObject.hpp"),Path("javm-nx-poc/libjavm/libjavm/include/javm/core/core_ManifestFile.hpp")]; [(p.write_text(("#include <algorithm>\n" if "#include <algorithm>" not in p.read_text() else "")+p.read_text())) for p in files]'
 
       # ============================================================
-      # HID moderno
+      # HID moderno para biblioteca NX/Java
       # ============================================================
 
-      - name: Port HID to modern libnx
+      - name: Port Java HID to modern libnx
         shell: bash
         run: |
           python3 -c 'from pathlib import Path; p=Path("javm-nx-poc/nx/native/nx/hid/Input.class.hpp"); s="""#pragma once
@@ -211,13 +211,13 @@ jobs:
           grep -q "LoadNativeClass<hid::Input>" \
             javm-nx-poc/nx/native/nx_Java.hpp
 
-          echo "HID moderno OK"
+          echo "HID OK"
 
       # ============================================================
-      # Java
+      # Java minimo
       # ============================================================
 
-      - name: Create Java test
+      - name: Create Java bridge test
         shell: bash
         run: |
           MAIN_JAVA=$(find javm-nx-poc/java-hello-world/src -type f -name "Main.java" | head -n 1)
@@ -234,53 +234,21 @@ jobs:
           '' \
           '    public static void main(String[] args) {' \
           '' \
-          '        System.out.println("Minecraft-NX");' \
-          '        System.out.println("Created by Farbert_Took");' \
-          '        System.out.println("==========================");' \
+          '        System.out.println("");' \
+          '        System.out.println("================================");' \
+          '        System.out.println(" Minecraft-NX Java");' \
+          '        System.out.println(" Created by Farbert_Took");' \
+          '        System.out.println("================================");' \
+          '        System.out.println("");' \
+          '        System.out.println("[JAVA 1] main() iniciou");' \
           '' \
-          '        System.out.println("[1] JVM OK");' \
+          '        int value = 21 * 2;' \
           '' \
-          '        String project = "Minecraft-NX";' \
-          '        System.out.println("[2] String OK");' \
-          '        System.out.println(project);' \
-          '' \
-          '        int a = 20;' \
-          '        int b = 22;' \
-          '        int result = a + b;' \
-          '' \
-          '        if(result == 42) {' \
-          '            System.out.println("[3] Inteiros OK");' \
+          '        if(value == 42) {' \
+          '            System.out.println("[JAVA 2] bytecode OK");' \
           '        }' \
           '' \
-          '        int multiply = 7 * 6;' \
-          '' \
-          '        if(multiply == 42) {' \
-          '            System.out.println("[4] Multiplicacao OK");' \
-          '        }' \
-          '' \
-          '        int counter = 0;' \
-          '' \
-          '        for(int i = 0; i < 5; i++) {' \
-          '            counter = counter + 1;' \
-          '        }' \
-          '' \
-          '        if(counter == 5) {' \
-          '            System.out.println("[5] Loop OK");' \
-          '        }' \
-          '' \
-          '        int[] numbers = new int[3];' \
-          '' \
-          '        numbers[0] = 10;' \
-          '        numbers[1] = 20;' \
-          '        numbers[2] = 30;' \
-          '' \
-          '        if(numbers[1] == 20) {' \
-          '            System.out.println("[6] Array OK");' \
-          '        }' \
-          '' \
-          '        System.out.println("==========================");' \
-          '        System.out.println("[DONE] Java test concluido");' \
-          '        System.out.println("Minecraft-NX by Farbert_Took");' \
+          '        System.out.println("[JAVA 3] main() terminou");' \
           '    }' \
           '}' \
           > "$MAIN_JAVA"
@@ -307,20 +275,22 @@ jobs:
           mvn clean package
 
       # ============================================================
-      # Main.cpp
+      # Launcher nativo de diagnostico
       #
-      # Executa o JAR e NAO sai automaticamente.
-      # Depois do Java, espera o botao +.
+      # IMPORTANTE:
+      # console + controle funcionam ANTES da JVM.
       # ============================================================
 
-      - name: Install Minecraft-NX launcher
+      - name: Install native bridge launcher
         shell: bash
         run: |
           MAIN_CPP="javm-nx-poc/javm/source/Main.cpp"
 
           cat > "$MAIN_CPP" <<'EOF'
           #include <switch.h>
+          #include <stdio.h>
           #include <string>
+
           #include <javm/core/core_Machine.hpp>
 
           using namespace javm;
@@ -328,73 +298,70 @@ jobs:
           #include <nx_Java.hpp>
 
 
-          void LogMessage(std::string msg) {
+          static PadState g_pad;
 
-              switch(appletGetAppletType()) {
 
-                  case AppletType_Application:
-                  case AppletType_SystemApplication: {
+          void UpdateScreen() {
 
-                      ErrorApplicationConfig cfg;
-
-                      errorApplicationCreate(
-                          &cfg,
-                          msg.c_str(),
-                          nullptr
-                      );
-
-                      errorApplicationShow(&cfg);
-
-                      break;
-                  }
-
-                  case AppletType_SystemApplet:
-                  case AppletType_LibraryApplet:
-                  case AppletType_OverlayApplet: {
-
-                      ErrorSystemConfig cfg;
-
-                      errorSystemCreate(
-                          &cfg,
-                          msg.c_str(),
-                          nullptr
-                      );
-
-                      errorSystemShow(&cfg);
-
-                      break;
-                  }
-
-                  default:
-                      break;
-              }
+              consoleUpdate(NULL);
           }
 
 
-          void WaitForPlus() {
+          void ClearScreen() {
 
-              PadState pad;
+              printf("\x1b[2J");
+              printf("\x1b[H");
+          }
 
-              padConfigureInput(
-                  1,
-                  HidNpadStyleSet_NpadStandard
-              );
 
-              padInitializeDefault(&pad);
-
+          bool WaitForA() {
 
               while(appletMainLoop()) {
 
-                  padUpdate(&pad);
+                  padUpdate(&g_pad);
 
                   u64 down =
-                      padGetButtonsDown(&pad);
+                      padGetButtonsDown(&g_pad);
+
+
+                  if(down & HidNpadButton_Plus) {
+                      return false;
+                  }
+
+
+                  if(down & HidNpadButton_A) {
+                      return true;
+                  }
+
+
+                  consoleUpdate(NULL);
+
+                  svcSleepThread(
+                      16'000'000
+                  );
+              }
+
+
+              return false;
+          }
+
+
+          void WaitForExit() {
+
+              while(appletMainLoop()) {
+
+                  padUpdate(&g_pad);
+
+                  u64 down =
+                      padGetButtonsDown(&g_pad);
 
 
                   if(down & HidNpadButton_Plus) {
                       break;
                   }
 
+
+                  consoleUpdate(NULL);
 
                   svcSleepThread(
                       16'000'000
@@ -403,60 +370,287 @@ jobs:
           }
 
 
+          void PrintHeader() {
+
+              printf(
+                  "Minecraft-NX - Native/JVM Bridge v3.4\n"
+              );
+
+              printf(
+                  "Created by Farbert_Took\n"
+              );
+
+              printf(
+                  "===================================\n\n"
+              );
+          }
+
+
           int main(int argc, char **argv) {
 
-              static char direct_app[] =
-                  "javm.nro";
-
-              static char direct_jar[] =
-                  "sdmc:/switch/minecraft-nx/test.jar";
-
-              static char *direct_argv[] = {
-                  direct_app,
-                  direct_jar,
-                  nullptr
-              };
+              consoleInit(NULL);
 
 
-              argc = 2;
-              argv = direct_argv;
+              padConfigureInput(
+                  1,
+                  HidNpadStyleSet_NpadStandard
+              );
+
+              padInitializeDefault(
+                  &g_pad
+              );
 
 
-              std::string jar =
-                  argv[1];
+              ClearScreen();
+
+              PrintHeader();
+
+
+              printf(
+                  "[BOOT 1] NRO iniciou.\n"
+              );
+
+              printf(
+                  "[BOOT 2] consoleInit OK.\n"
+              );
+
+              printf(
+                  "[BOOT 3] PadState OK.\n\n"
+              );
+
+
+              printf(
+                  "A JavaVM AINDA NAO FOI INICIADA.\n\n"
+              );
+
+
+              printf(
+                  "A = criar JavaVM\n"
+              );
+
+              printf(
+                  "+ = sair\n"
+              );
+
+
+              UpdateScreen();
+
+
+              if(!WaitForA()) {
+
+                  consoleExit(NULL);
+
+                  return 0;
+              }
+
+
+              ClearScreen();
+
+              PrintHeader();
+
+
+              printf(
+                  "[NATIVE 1] Criando core::Machine...\n"
+              );
+
+              UpdateScreen();
 
 
               core::Machine machine;
 
 
+              printf(
+                  "[NATIVE 2] core::Machine OK.\n\n"
+              );
+
+
+              printf(
+                  "A = carregar classes nativas\n"
+              );
+
+              printf(
+                  "+ = sair\n"
+              );
+
+
+              UpdateScreen();
+
+
+              if(!WaitForA()) {
+
+                  consoleExit(NULL);
+
+                  return 0;
+              }
+
+
+              printf(
+                  "\n[NATIVE 3] LoadBuiltinNativeClasses...\n"
+              );
+
+              UpdateScreen();
+
+
               machine.LoadBuiltinNativeClasses();
 
 
+              printf(
+                  "[NATIVE 4] Builtin classes OK.\n\n"
+              );
+
+
+              printf(
+                  "A = carregar classes NX\n"
+              );
+
+              printf(
+                  "+ = sair\n"
+              );
+
+
+              UpdateScreen();
+
+
+              if(!WaitForA()) {
+
+                  consoleExit(NULL);
+
+                  return 0;
+              }
+
+
+              printf(
+                  "\n[NATIVE 5] nx::LoadClasses...\n"
+              );
+
+              UpdateScreen();
+
+
               nx::LoadClasses(machine);
+
+
+              printf(
+                  "[NATIVE 6] Classes NX OK.\n\n"
+              );
+
+
+              printf(
+                  "A = carregar test.jar\n"
+              );
+
+              printf(
+                  "+ = sair\n"
+              );
+
+
+              UpdateScreen();
+
+
+              if(!WaitForA()) {
+
+                  consoleExit(NULL);
+
+                  return 0;
+              }
+
+
+              std::string jar =
+                  "sdmc:/switch/minecraft-nx/test.jar";
+
+
+              printf(
+                  "\n[NATIVE 7] LoadJavaArchive...\n"
+              );
+
+              printf(
+                  "JAR: %s\n",
+                  jar.c_str()
+              );
+
+
+              UpdateScreen();
 
 
               auto &jar_ref =
                   machine.LoadJavaArchive(jar);
 
 
+              printf(
+                  "[NATIVE 8] LoadJavaArchive retornou.\n"
+              );
+
+
+              UpdateScreen();
+
+
               if(!jar_ref->CanBeExecuted()) {
 
-                  LogMessage(
-                      "Minecraft-NX\n"
-                      "Created by Farbert_Took\n\n"
-                      "ERRO:\n"
-                      "Nao foi possivel executar test.jar.\n\n"
-                      "Pressione + para sair."
+                  printf(
+                      "\n[ERRO] JAR nao executavel.\n"
                   );
 
-                  WaitForPlus();
+                  printf(
+                      "\nPressione + para sair.\n"
+                  );
+
+
+                  UpdateScreen();
+
+                  WaitForExit();
+
+                  consoleExit(NULL);
 
                   return 0;
               }
 
 
+              printf(
+                  "[NATIVE 9] JAR executavel.\n\n"
+              );
+
+
+              printf(
+                  "A = executar Java main()\n"
+              );
+
+              printf(
+                  "+ = sair\n"
+              );
+
+
+              UpdateScreen();
+
+
+              if(!WaitForA()) {
+
+                  consoleExit(NULL);
+
+                  return 0;
+              }
+
+
+              printf(
+                  "\n[NATIVE 10] Criando args Java...\n"
+              );
+
+              UpdateScreen();
+
+
               auto args_array_value =
                   core::CreateArray<java::lang::String>(0);
+
+
+              printf(
+                  "[NATIVE 11] args OK.\n"
+              );
+
+
+              printf(
+                  "[NATIVE 12] Chamando Java main()...\n\n"
+              );
+
+
+              UpdateScreen();
 
 
               machine.CallFunction(
@@ -466,48 +660,96 @@ jobs:
               );
 
 
+              printf(
+                  "\n[NATIVE 13] Java main() retornou.\n"
+              );
+
+
+              UpdateScreen();
+
+
               if(machine.WasExceptionThrown()) {
 
                   auto info =
                       machine.GetExceptionInfo();
 
 
-                  LogMessage(
-                      "Minecraft-NX\n"
-                      "Created by Farbert_Took\n\n"
-                      "Java exception:\n" +
-                      info.class_type +
-                      "\n" +
-                      info.message +
-                      "\n\nPressione + para sair."
+                  printf(
+                      "\n[JAVA EXCEPTION]\n"
                   );
 
 
-                  WaitForPlus();
+                  printf(
+                      "Classe: %s\n",
+                      info.class_type.c_str()
+                  );
+
+
+                  printf(
+                      "Mensagem: %s\n",
+                      info.message.c_str()
+                  );
+
+
+                  printf(
+                      "\nPressione + para sair.\n"
+                  );
+
+
+                  UpdateScreen();
+
+                  WaitForExit();
+
+                  consoleExit(NULL);
 
                   return 0;
               }
 
 
-              LogMessage(
-                  "Minecraft-NX\n"
-                  "Created by Farbert_Took\n\n"
-                  "Java terminou normalmente.\n\n"
-                  "JVM: OK\n"
-                  "JAR: OK\n"
-                  "Main: OK\n\n"
-                  "Pressione + para sair."
+              printf(
+                  "\n===================================\n"
               );
 
 
-              WaitForPlus();
+              printf(
+                  "[SUCCESS] Java executou normalmente.\n"
+              );
 
+
+              printf(
+                  "Minecraft-NX by Farbert_Took\n"
+              );
+
+
+              printf(
+                  "===================================\n\n"
+              );
+
+
+              printf(
+                  "O programa permanecera aberto.\n"
+              );
+
+
+              printf(
+                  "Pressione + para sair.\n"
+              );
+
+
+              UpdateScreen();
+
+
+              WaitForExit();
+
+
+              consoleExit(NULL);
 
               return 0;
           }
           EOF
 
-          echo "=== Minecraft-NX Main.cpp ==="
+          echo ""
+          echo "=== Main.cpp ==="
           cat "$MAIN_CPP"
 
       # ============================================================
@@ -521,7 +763,7 @@ jobs:
           make -j2
 
       # ============================================================
-      # Pacote final
+      # Pacote SD
       # ============================================================
 
       - name: Prepare SD package
@@ -568,9 +810,11 @@ jobs:
 
           echo ""
           echo "========================================"
-          echo " Minecraft-NX v3.3"
+          echo " Minecraft-NX Native/JVM Bridge v3.4"
           echo " Created by Farbert_Took"
           echo "========================================"
+
+          echo ""
 
           find SD -type f -print
 
@@ -605,15 +849,15 @@ jobs:
 
 
           echo ""
-          echo "Minecraft-NX v3.3 pronto"
+          echo "Minecraft-NX v3.4 pronto"
           echo "Created by Farbert_Took"
 
       # ============================================================
       # Artifact
       # ============================================================
 
-      - name: Upload Minecraft-NX Java v3.3
+      - name: Upload Minecraft-NX v3.4
         uses: actions/upload-artifact@v4
         with:
-          name: Minecraft-NX-Farbert_Took-v3.3
+          name: Minecraft-NX-Farbert_Took-v3.4
           path: SD
