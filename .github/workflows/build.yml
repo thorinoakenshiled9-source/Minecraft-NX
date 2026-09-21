@@ -1,4 +1,4 @@
-name: Minecraft-NX Java Recovery v2
+name: Minecraft-NX Java Baseline v3
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  recovery:
+  baseline:
     runs-on: ubuntu-latest
 
     container:
@@ -26,8 +26,6 @@ jobs:
 
       # ============================================================
       # Clone LIMPO
-      #
-      # Remove qualquer pasta existente antes do git clone.
       # ============================================================
 
       - name: Clone original JavaVM
@@ -38,11 +36,10 @@ jobs:
           git clone --recursive \
             https://github.com/XorTroll/javm-nx-poc.git
 
-          echo ""
-          echo "JavaVM clonado com sucesso."
+          echo "JavaVM clonado."
 
       # ============================================================
-      # Compatibilidade C++ atual
+      # Compatibilidade C++
       # ============================================================
 
       - name: Patch algorithm compatibility
@@ -50,14 +47,9 @@ jobs:
         run: |
           python3 -c 'from pathlib import Path; files=[Path("javm-nx-poc/libjavm/libjavm/include/javm/core/core_ClassObject.hpp"),Path("javm-nx-poc/libjavm/libjavm/include/javm/core/core_ManifestFile.hpp")]; [(p.write_text(("#include <algorithm>\n" if "#include <algorithm>" not in p.read_text() else "")+p.read_text())) for p in files]'
 
-          echo ""
-          echo "algorithm compatibility OK"
-
       # ============================================================
-      # HID antigo -> PadState atual
-      #
-      # Mantemos exatamente a abordagem que permitiu o
-      # Hello World funcionar anteriormente.
+      # HID moderno
+      # MESMO patch do Recovery v2 funcional
       # ============================================================
 
       - name: Patch HID for modern libnx
@@ -124,7 +116,6 @@ jobs:
                               (void)controller;
 
                               EnsureInitialized();
-
                               padUpdate(&pad);
 
                               u64 keys =
@@ -151,7 +142,6 @@ jobs:
                               (void)controller;
 
                               EnsureInitialized();
-
                               padUpdate(&pad);
 
                               u64 keys =
@@ -178,7 +168,6 @@ jobs:
                               (void)controller;
 
                               EnsureInitialized();
-
                               padUpdate(&pad);
 
                               u64 keys =
@@ -197,7 +186,7 @@ jobs:
           """; p.write_text(s)'
 
       # ============================================================
-      # Verifica registro da classe Input
+      # Confirma HID
       # ============================================================
 
       - name: Verify native Input
@@ -213,36 +202,48 @@ jobs:
             "LoadNativeClass<hid::Input>" \
             javm-nx-poc/nx/native/nx_Java.hpp
 
-          echo ""
-          echo "HID/Input registrado corretamente."
+          echo "HID OK"
 
       # ============================================================
-      # NÃO ALTERAMOS O JAVA
+      # ÚNICA MUDANÇA EM RELAÇÃO AO BASELINE:
       #
-      # Mostra o Main.java original apenas para confirmar
-      # exatamente o que estamos compilando.
+      # Main.java
       # ============================================================
 
-      - name: Show original Hello World
+      - name: Change Hello World text
         shell: bash
         run: |
-          echo ""
-          echo "========================================"
-          echo " ORIGINAL JAVA HELLO WORLD"
-          echo "========================================"
-
-          find \
+          MAIN_JAVA=$(find \
             javm-nx-poc/java-hello-world/src \
             -type f \
-            -name "*.java" \
-            -print \
-            -exec cat {} \;
+            -name "Main.java" \
+            | head -n 1)
+
+          if [ -z "$MAIN_JAVA" ]; then
+            echo "ERRO: Main.java nao encontrado"
+            exit 1
+          fi
+
+          echo "Main.java:"
+          echo "$MAIN_JAVA"
+
+          printf '%s\n' \
+          'package javmnx.helloworld;' \
+          '' \
+          'public class Main {' \
+          '    public static void main(String[] args) {' \
+          '        System.out.println("Minecraft-NX");' \
+          '        System.out.println("Created by Farbert_Took");' \
+          '    }' \
+          '}' \
+          > "$MAIN_JAVA"
 
           echo ""
-          echo "========================================"
+          echo "=== Main.java MODIFICADO ==="
+          cat "$MAIN_JAVA"
 
       # ============================================================
-      # Compila biblioteca Java NX
+      # Biblioteca NX Java
       # ============================================================
 
       - name: Build NX Java library
@@ -251,53 +252,29 @@ jobs:
           mvn package
 
       # ============================================================
-      # Compila Hello World ORIGINAL
+      # Compila o MESMO projeto java-hello-world
       # ============================================================
 
-      - name: Build original Hello World
+      - name: Build Java program
         working-directory: javm-nx-poc/java-hello-world
         run: |
           mvn clean package
 
       # ============================================================
-      # Mostra os JARs gerados
+      # Launcher:
+      # MESMO patch do Recovery v2 funcional
       # ============================================================
 
-      - name: Locate Hello World JAR
-        shell: bash
-        run: |
-          echo ""
-          echo "========================================"
-          echo " JAR GERADO"
-          echo "========================================"
-
-          find \
-            javm-nx-poc/java-hello-world/target \
-            -maxdepth 1 \
-            -type f \
-            -name "*.jar" \
-            -print
-
-      # ============================================================
-      # Patch mínimo do launcher
-      #
-      # O javm abre diretamente:
-      #
-      # sdmc:/switch/java-hello-world.jar
-      #
-      # Não adicionamos console, loops, checkpoints etc.
-      # ============================================================
-
-      - name: Patch direct Hello World launch
+      - name: Patch direct Java launch
         shell: bash
         run: |
           python3 -c 'from pathlib import Path; p=Path("javm-nx-poc/javm/source/Main.cpp"); s=p.read_text(); marker="int main(int argc, char **argv)"; marker2="int main(int argc, char *argv[])"; marker=marker if marker in s else marker2; assert marker in s, "main nao encontrado"; start=s.index(marker); brace=s.index("{", start)+1; patch="\n    static char direct_app[] = \"javm.nro\";\n    static char direct_jar[] = \"sdmc:/switch/java-hello-world.jar\";\n    static char *direct_argv[] = { direct_app, direct_jar, nullptr };\n    argc = 2;\n    argv = direct_argv;\n"; p.write_text(s[:brace]+patch+s[brace:]); print(p.read_text())'
 
       # ============================================================
-      # Confere se o caminho foi inserido
+      # Verifica launcher
       # ============================================================
 
-      - name: Verify direct launch patch
+      - name: Verify direct launch
         shell: bash
         run: |
           set -e
@@ -306,11 +283,10 @@ jobs:
             'sdmc:/switch/java-hello-world.jar' \
             javm-nx-poc/javm/source/Main.cpp
 
-          echo ""
-          echo "Direct launch OK"
+          echo "Launcher OK"
 
       # ============================================================
-      # Compila javm.nro
+      # Compila JavaVM
       # ============================================================
 
       - name: Build JavaVM
@@ -320,56 +296,18 @@ jobs:
           make -j2
 
       # ============================================================
-      # Localiza NRO e JAR
+      # Pacote SD
+      #
+      # MESMOS caminhos do baseline funcional
       # ============================================================
 
-      - name: Locate build outputs
-        shell: bash
-        run: |
-          echo ""
-          echo "========================================"
-          echo " NRO"
-          echo "========================================"
-
-          find \
-            javm-nx-poc/javm \
-            -type f \
-            -name "javm.nro" \
-            -print
-
-          echo ""
-          echo "========================================"
-          echo " JAR"
-          echo "========================================"
-
-          find \
-            javm-nx-poc/java-hello-world/target \
-            -maxdepth 1 \
-            -type f \
-            -name "*.jar" \
-            -print
-
-      # ============================================================
-      # Cria pacote SD LIMPO
-      #
-      # Resultado:
-      #
-      # SD/
-      #   switch/
-      #     javm.nro
-      #     java-hello-world.jar
-      #
-      # ============================================================
-
-      - name: Prepare clean recovery package
+      - name: Prepare SD package
         shell: bash
         run: |
           set -e
 
           rm -rf SD
-
           mkdir -p SD/switch
-
 
           JAVM_NRO=$(find \
             javm-nx-poc/javm \
@@ -377,107 +315,68 @@ jobs:
             -name "javm.nro" \
             | head -n 1)
 
-
-          HELLO_JAR=$(find \
+          JAVA_JAR=$(find \
             javm-nx-poc/java-hello-world/target \
             -maxdepth 1 \
             -type f \
             -name "*.jar" \
             | head -n 1)
 
-
           if [ -z "$JAVM_NRO" ]; then
-
             echo "ERRO: javm.nro nao encontrado"
-
             exit 1
           fi
 
-
-          if [ -z "$HELLO_JAR" ]; then
-
-            echo "ERRO: java-hello-world.jar nao encontrado"
-
+          if [ -z "$JAVA_JAR" ]; then
+            echo "ERRO: JAR nao encontrado"
             exit 1
           fi
-
-
-          echo ""
-          echo "Copiando NRO:"
-          echo "$JAVM_NRO"
-
 
           cp \
             "$JAVM_NRO" \
             SD/switch/javm.nro
 
-
-          echo ""
-          echo "Copiando JAR:"
-          echo "$HELLO_JAR"
-
-
           cp \
-            "$HELLO_JAR" \
+            "$JAVA_JAR" \
             SD/switch/java-hello-world.jar
-
 
           echo ""
           echo "========================================"
-          echo " Minecraft-NX Recovery v2"
+          echo " Minecraft-NX Java Baseline v3"
           echo " Created by Farbert_Took"
           echo "========================================"
 
-          echo ""
-          echo "Pacote final:"
-
-          find \
-            SD \
-            -type f \
-            -print
+          find SD -type f -print
 
       # ============================================================
       # Verificação final
       # ============================================================
 
-      - name: Verify recovery package
+      - name: Verify package
         shell: bash
         run: |
           set -e
 
-          test -f \
-            SD/switch/javm.nro
-
-          test -f \
-            SD/switch/java-hello-world.jar
-
+          test -f SD/switch/javm.nro
+          test -f SD/switch/java-hello-world.jar
 
           echo ""
           echo "=== javm.nro ==="
-
-          ls -lh \
-            SD/switch/javm.nro
-
+          ls -lh SD/switch/javm.nro
 
           echo ""
           echo "=== java-hello-world.jar ==="
-
-          ls -lh \
-            SD/switch/java-hello-world.jar
-
+          ls -lh SD/switch/java-hello-world.jar
 
           echo ""
-          echo "========================================"
-          echo " RECOVERY v2 OK"
-          echo " Created by Farbert_Took"
-          echo "========================================"
+          echo "Baseline v3 OK"
 
       # ============================================================
       # Artifact único
       # ============================================================
 
-      - name: Upload Recovery v2
+      - name: Upload Baseline v3
         uses: actions/upload-artifact@v4
         with:
-          name: Minecraft-NX-Farbert_Took-Recovery-v2
+          name: Minecraft-NX-Farbert_Took-Baseline-v3
           path: SD
