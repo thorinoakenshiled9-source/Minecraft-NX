@@ -1,4 +1,4 @@
-name: Minecraft-NX Native JVM Bridge v3.4
+name: Minecraft-NX Java Recovery Baseline
 
 on:
   push:
@@ -7,34 +7,392 @@ on:
   workflow_dispatch:
 
 jobs:
-  minecraft:
+  recovery:
     runs-on: ubuntu-latest
 
     container:
       image: devkitpro/devkita64:latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      # ============================================================
+      # Ferramentas
+      # ============================================================
 
-      - name: Build Minecraft-NX
-        run: make -j2
+      - name: Install tools
+        run: |
+          apt-get update
+          apt-get install -y git python3 maven
 
-      - name: Upload Minecraft-NX
+      # ============================================================
+      # Baixa o javm-nx-poc ORIGINAL
+      # ============================================================
+
+      - name: Clone original JavaVM
+        run: |
+          git clone --recursive https://github.com/XorTroll/javm-nx-poc.git
+
+      # ============================================================
+      # PATCH 1
+      # Compatibilidade com compilador C++ atual
+      # ============================================================
+
+      - name: Patch algorithm compatibility
+        shell: bash
+        run: |
+          python3 -c 'from pathlib import Path; files=[Path("javm-nx-poc/libjavm/libjavm/include/javm/core/core_ClassObject.hpp"),Path("javm-nx-poc/libjavm/libjavm/include/javm/core/core_ManifestFile.hpp")]; [(p.write_text(("#include <algorithm>\n" if "#include <algorithm>" not in p.read_text() else "")+p.read_text())) for p in files]'
+
+      # ============================================================
+      # PATCH 2
+      # HID antigo -> PadState atual
+      #
+      # Esse e o patch que permitiu o Hello World funcionar.
+      # ============================================================
+
+      - name: Patch HID for modern libnx
+        shell: bash
+        run: |
+          python3 -c 'from pathlib import Path; p=Path("javm-nx-poc/nx/native/nx/hid/Input.class.hpp"); s="""#pragma once
+
+          #include <nx_Include.hpp>
+          #include <switch.h>
+
+          namespace nx::hid {
+
+              class Input : public native::Class {
+
+                  private:
+
+                      inline static PadState pad;
+                      inline static bool initialized = false;
+
+                      static void EnsureInitialized() {
+
+                          if(!initialized) {
+
+                              padConfigureInput(
+                                  1,
+                                  HidNpadStyleSet_NpadStandard
+                              );
+
+                              padInitializeDefault(&pad);
+
+                              initialized = true;
+                          }
+                      }
+
+                  public:
+
+                      JAVM_NATIVE_CLASS_CTOR(Input) {
+
+                          JAVM_NATIVE_CLASS_NAME("nx.hid.Input")
+
+                          JAVM_NATIVE_CLASS_REGISTER_STATIC_FN(
+                              getDownInput
+                          )
+
+                          JAVM_NATIVE_CLASS_REGISTER_STATIC_FN(
+                              getUpInput
+                          )
+
+                          JAVM_NATIVE_CLASS_REGISTER_STATIC_FN(
+                              getHeldInput
+                          )
+                      }
+
+                      core::Value getDownInput(
+                          core::Frame &frame,
+                          std::vector<core::FunctionParameter> parameters
+                      ) {
+
+                          if(parameters.size() > 0) {
+
+                              auto controller =
+                                  parameters[0].value->Get<long>();
+
+                              (void)controller;
+
+                              EnsureInitialized();
+
+                              padUpdate(&pad);
+
+                              u64 keys =
+                                  padGetButtonsDown(&pad);
+
+                              return core::CreateNewValue<long>(
+                                  static_cast<long>(keys)
+                              );
+                          }
+
+                          JAVM_NATIVE_CLASS_NO_RETURN
+                      }
+
+                      core::Value getUpInput(
+                          core::Frame &frame,
+                          std::vector<core::FunctionParameter> parameters
+                      ) {
+
+                          if(parameters.size() > 0) {
+
+                              auto controller =
+                                  parameters[0].value->Get<long>();
+
+                              (void)controller;
+
+                              EnsureInitialized();
+
+                              padUpdate(&pad);
+
+                              u64 keys =
+                                  padGetButtonsUp(&pad);
+
+                              return core::CreateNewValue<long>(
+                                  static_cast<long>(keys)
+                              );
+                          }
+
+                          JAVM_NATIVE_CLASS_NO_RETURN
+                      }
+
+                      core::Value getHeldInput(
+                          core::Frame &frame,
+                          std::vector<core::FunctionParameter> parameters
+                      ) {
+
+                          if(parameters.size() > 0) {
+
+                              auto controller =
+                                  parameters[0].value->Get<long>();
+
+                              (void)controller;
+
+                              EnsureInitialized();
+
+                              padUpdate(&pad);
+
+                              u64 keys =
+                                  padGetButtons(&pad);
+
+                              return core::CreateNewValue<long>(
+                                  static_cast<long>(keys)
+                              );
+                          }
+
+                          JAVM_NATIVE_CLASS_NO_RETURN
+                      }
+              };
+
+          }
+          """; p.write_text(s)'
+
+      # ============================================================
+      # Verifica se Input continua registrado
+      # ============================================================
+
+      - name: Verify native Input
+        shell: bash
+        run: |
+          grep -q "Input.class.hpp" \
+            javm-nx-poc/nx/native/nx_Java.hpp
+
+          grep -q "LoadNativeClass<hid::Input>" \
+            javm-nx-poc/nx/native/nx_Java.hpp
+
+          echo "Input HID registrado corretamente"
+
+      # ============================================================
+      # IMPORTANTE:
+      # NAO alteramos Main.java.
+      #
+      # Vamos usar o Hello World ORIGINAL do projeto.
+      # ============================================================
+
+      - name: Show original Java source
+        shell: bash
+        run: |
+          echo "========================================"
+          echo " ORIGINAL java-hello-world"
+          echo "========================================"
+
+          find \
+            javm-nx-poc/java-hello-world/src \
+            -type f \
+            -name "*.java" \
+            -print \
+            -exec cat {} \;
+
+      # ============================================================
+      # Biblioteca NX Java
+      # ============================================================
+
+      - name: Build original NX Java library
+        working-directory: javm-nx-poc/nx/java
+        run: |
+          mvn package
+
+      # ============================================================
+      # Hello World ORIGINAL
+      # ============================================================
+
+      - name: Build original Hello World
+        working-directory: javm-nx-poc/java-hello-world
+        run: |
+          mvn clean package
+
+      # ============================================================
+      # Descobre exatamente qual JAR foi criado
+      # ============================================================
+
+      - name: Locate original Hello World JAR
+        shell: bash
+        run: |
+          echo "========================================"
+          echo " JAR GERADO"
+          echo "========================================"
+
+          find \
+            javm-nx-poc/java-hello-world/target \
+            -maxdepth 1 \
+            -type f \
+            -name "*.jar" \
+            -print
+
+      # ============================================================
+      # ÚNICA alteração no Main.cpp:
+      #
+      # força o mesmo tipo de lançamento direto que funcionou.
+      #
+      # NÃO adicionamos:
+      # - consoleInit
+      # - PadState no launcher
+      # - checkpoints
+      # - loops
+      # - LogMessage extra
+      # ============================================================
+
+      - name: Patch direct Hello World launch
+        shell: bash
+        run: |
+          python3 -c 'from pathlib import Path; p=Path("javm-nx-poc/javm/source/Main.cpp"); s=p.read_text(); marker="int main(int argc, char **argv)"; marker2="int main(int argc, char *argv[])"; marker=marker if marker in s else marker2; assert marker in s, "main nao encontrado"; start=s.index(marker); brace=s.index("{", start)+1; patch="\n    static char direct_app[] = \"javm.nro\";\n    static char direct_jar[] = \"sdmc:/switch/java-hello-world.jar\";\n    static char *direct_argv[] = { direct_app, direct_jar, nullptr };\n    argc = 2;\n    argv = direct_argv;\n"; p.write_text(s[:brace]+patch+s[brace:]); print(p.read_text())'
+
+      # ============================================================
+      # Build javm
+      # ============================================================
+
+      - name: Build JavaVM
+        working-directory: javm-nx-poc/javm
+        run: |
+          make clean || true
+          make -j2
+
+      # ============================================================
+      # Pacote SD
+      #
+      # Mantemos os nomes do baseline funcional:
+      #
+      # /switch/javm.nro
+      # /switch/java-hello-world.jar
+      # ============================================================
+
+      - name: Prepare recovery package
+        shell: bash
+        run: |
+          set -e
+
+          rm -rf SD
+
+          mkdir -p SD/switch
+
+
+          JAVM_NRO=$(find \
+            javm-nx-poc/javm \
+            -type f \
+            -name "javm.nro" \
+            | head -n 1)
+
+
+          HELLO_JAR=$(find \
+            javm-nx-poc/java-hello-world/target \
+            -maxdepth 1 \
+            -type f \
+            -name "*.jar" \
+            | head -n 1)
+
+
+          if [ -z "$JAVM_NRO" ]; then
+
+            echo "ERRO: javm.nro nao encontrado"
+
+            exit 1
+          fi
+
+
+          if [ -z "$HELLO_JAR" ]; then
+
+            echo "ERRO: Hello World JAR nao encontrado"
+
+            exit 1
+          fi
+
+
+          cp \
+            "$JAVM_NRO" \
+            SD/switch/javm.nro
+
+
+          cp \
+            "$HELLO_JAR" \
+            SD/switch/java-hello-world.jar
+
+
+          echo ""
+          echo "========================================"
+          echo " Minecraft-NX Recovery Baseline"
+          echo " Created by Farbert_Took"
+          echo "========================================"
+
+          echo ""
+
+          find SD -type f -print
+
+      # ============================================================
+      # Verificação
+      # ============================================================
+
+      - name: Verify recovery package
+        shell: bash
+        run: |
+          set -e
+
+          test -f SD/switch/javm.nro
+          test -f SD/switch/java-hello-world.jar
+
+
+          echo ""
+          echo "=== javm.nro ==="
+
+          ls -lh \
+            SD/switch/javm.nro
+
+
+          echo ""
+          echo "=== java-hello-world.jar ==="
+
+          ls -lh \
+            SD/switch/java-hello-world.jar
+
+
+          echo ""
+          echo "RECOVERY BASELINE OK"
+
+      # ============================================================
+      # Um único artifact
+      # ============================================================
+
+      - name: Upload recovery baseline
         uses: actions/upload-artifact@v4
         with:
-          name: Minecraft-NX-Farbert_Took
-          path: Minecraft-NX.nro
-
-
-  java-bridge:
-    runs-on: ubuntu-latest
-
-    container:
-      image: devkitpro/devkita64:latest
-
-    steps:
-
+          name: Minecraft-NX-Farbert_Took-Recovery-Baseline
+          path: SD
       # ============================================================
       # Ferramentas
       # ============================================================
