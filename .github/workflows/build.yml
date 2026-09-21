@@ -1,4 +1,4 @@
-name: Build Minecraft-NX
+name: Build Minecraft-NX + JavaVM
 
 on:
   workflow_dispatch:
@@ -6,20 +6,51 @@ on:
     branches: [ "main", "master" ]
 
 jobs:
-  build:
+  build-minecraft-nx:
     runs-on: ubuntu-latest
     container:
       image: devkitpro/devkita64:latest
 
     steps:
-      - name: Checkout
+      - name: Checkout Minecraft-NX
         uses: actions/checkout@v4
 
-      - name: Build NRO
+      - name: Build Minecraft-NX
         run: make -j2
 
-      - name: Upload NRO
+      - name: Upload Minecraft-NX
         uses: actions/upload-artifact@v4
         with:
           name: Minecraft-NX-nro
           path: Minecraft-NX.nro
+
+  build-javm:
+    runs-on: ubuntu-latest
+    container:
+      image: devkitpro/devkita64:latest
+
+    steps:
+      - name: Install git
+        run: |
+          apt-get update
+          apt-get install -y git
+
+      - name: Clone javm-nx-poc
+        run: |
+          git clone --recursive https://github.com/XorTroll/javm-nx-poc.git
+
+      - name: Build Java VM
+        working-directory: javm-nx-poc/javm
+        run: make -j2
+
+      - name: Find generated files
+        run: |
+          find javm-nx-poc -name "*.nro" -o -name "*.nacp"
+
+      - name: Upload Java VM
+        uses: actions/upload-artifact@v4
+        with:
+          name: Minecraft-NX-JavaVM
+          path: |
+            javm-nx-poc/**/*.nro
+            javm-nx-poc/sd_out/**
