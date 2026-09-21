@@ -1,4 +1,4 @@
-name: Build Minecraft-NX by Farbert_Took
+name: Minecraft-NX Java Diagnostic v3
 
 on:
   push:
@@ -26,25 +26,24 @@ jobs:
           name: Minecraft-NX-Farbert_Took
           path: Minecraft-NX.nro
 
-  java-capability:
+  java-diagnostic:
     runs-on: ubuntu-latest
 
     container:
       image: devkitpro/devkita64:latest
 
     steps:
-
       - name: Install tools
         run: |
           apt-get update
-          apt-get install -y git python3 maven unzip
+          apt-get install -y git python3 maven
 
       - name: Clone JavaVM
         run: |
           git clone --recursive https://github.com/XorTroll/javm-nx-poc.git
 
       # ============================================================
-      # Compatibilidade C++
+      # C++ compatibility
       # ============================================================
 
       - name: Patch algorithm compatibility
@@ -53,7 +52,7 @@ jobs:
           python3 -c 'from pathlib import Path; files=[Path("javm-nx-poc/libjavm/libjavm/include/javm/core/core_ClassObject.hpp"),Path("javm-nx-poc/libjavm/libjavm/include/javm/core/core_ManifestFile.hpp")]; [(p.write_text(("#include <algorithm>\n" if "#include <algorithm>" not in p.read_text() else "")+p.read_text())) for p in files]'
 
       # ============================================================
-      # Port do HID antigo para PadState do libnx atual
+      # HID moderno - mesma base que executou Hello World
       # ============================================================
 
       - name: Port HID to modern libnx
@@ -204,31 +203,10 @@ jobs:
           echo "HID OK"
 
       # ============================================================
-      # Mostra estrutura original do Hello World
+      # Java: usa exatamente Main.java do exemplo original
       # ============================================================
 
-      - name: Show original Java project
-        shell: bash
-        run: |
-          echo "=== JAVA SOURCES ==="
-
-          find \
-            javm-nx-poc/java-hello-world \
-            -type f \
-            -name "*.java" \
-            -print
-
-          echo ""
-          echo "=== POM ==="
-
-          cat javm-nx-poc/java-hello-world/pom.xml
-
-      # ============================================================
-      # Substitui somente Main.java
-      # Mantemos o projeto Maven original que ja funcionou.
-      # ============================================================
-
-      - name: Create Minecraft-NX capability test
+      - name: Create minimal Minecraft-NX Java test
         shell: bash
         run: |
           MAIN_JAVA=$(find javm-nx-poc/java-hello-world/src -type f -name "Main.java" | head -n 1)
@@ -238,75 +216,27 @@ jobs:
             exit 1
           fi
 
-          echo "Main.java:"
+          echo "Main original:"
           echo "$MAIN_JAVA"
 
           printf '%s\n' \
           'package javmnx.helloworld;' \
           '' \
           'public class Main {' \
-          '' \
           '    public static void main(String[] args) {' \
-          '' \
           '        System.out.println("Minecraft-NX");' \
           '        System.out.println("Created by Farbert_Took");' \
-          '        System.out.println("==========================");' \
-          '' \
           '        System.out.println("[1] JVM OK");' \
-          '' \
-          '        String project = "Minecraft-NX";' \
-          '        System.out.println("[2] String OK");' \
-          '        System.out.println(project);' \
-          '' \
-          '        int a = 20;' \
-          '        int b = 22;' \
-          '        int result = a + b;' \
-          '' \
-          '        if(result == 42) {' \
-          '            System.out.println("[3] Inteiros OK");' \
-          '        }' \
-          '' \
-          '        int multiply = 7 * 6;' \
-          '' \
-          '        if(multiply == 42) {' \
-          '            System.out.println("[4] Multiplicacao OK");' \
-          '        }' \
-          '' \
-          '        int counter = 0;' \
-          '' \
-          '        for(int i = 0; i < 5; i++) {' \
-          '            counter = counter + 1;' \
-          '        }' \
-          '' \
-          '        if(counter == 5) {' \
-          '            System.out.println("[5] Loop OK");' \
-          '        }' \
-          '' \
-          '        int[] numbers = new int[3];' \
-          '' \
-          '        numbers[0] = 10;' \
-          '        numbers[1] = 20;' \
-          '        numbers[2] = 30;' \
-          '' \
-          '        if(numbers[1] == 20) {' \
-          '            System.out.println("[6] Array OK");' \
-          '        }' \
-          '' \
-          '        System.out.println("==========================");' \
-          '        System.out.println("[DONE] Java test concluido");' \
-          '        System.out.println("Minecraft-NX by Farbert_Took");' \
-          '        System.out.println("Use HOME para sair");' \
           '    }' \
           '}' \
           > "$MAIN_JAVA"
 
           echo ""
-          echo "=== Minecraft-NX Main.java ==="
-
+          echo "=== Main.java ==="
           cat "$MAIN_JAVA"
 
       # ============================================================
-      # Biblioteca Java NX
+      # Biblioteca Java nx
       # ============================================================
 
       - name: Build nx Java library
@@ -315,46 +245,49 @@ jobs:
           mvn package
 
       # ============================================================
-      # Capability JAR
+      # JAR usando exatamente o Maven original
       # ============================================================
 
-      - name: Build capability JAR
+      - name: Build Java diagnostic
         working-directory: javm-nx-poc/java-hello-world
         run: |
           mvn clean package
 
-      - name: Inspect capability JAR
+      - name: Locate Java JAR
         shell: bash
         run: |
-          JAR_FILE=$(find javm-nx-poc/java-hello-world/target -maxdepth 1 -type f -name "*.jar" | head -n 1)
-
-          if [ -z "$JAR_FILE" ]; then
-            echo "ERRO: JAR nao encontrado"
-            exit 1
-          fi
-
-          echo "=== JAR ==="
-          echo "$JAR_FILE"
-
-          echo ""
-          echo "=== CONTEUDO ==="
-          unzip -l "$JAR_FILE"
-
-          echo ""
-          echo "=== MANIFEST ==="
-          unzip -p "$JAR_FILE" META-INF/MANIFEST.MF
+          echo "=== JARs ==="
+          find javm-nx-poc/java-hello-world/target \
+            -maxdepth 1 \
+            -type f \
+            -name "*.jar" \
+            -print
 
       # ============================================================
-      # Forca javm.nro a iniciar nosso capability-test.jar
+      # Direct launch
+      #
+      # IMPORTANTE:
+      # mantemos o nome javm.nro.
       # ============================================================
 
-      - name: Patch direct JAR launch
+      - name: Patch direct launch
         shell: bash
         run: |
-          python3 -c 'from pathlib import Path; p=Path("javm-nx-poc/javm/source/Main.cpp"); s=p.read_text(); marker="int main(int argc, char **argv)"; marker2="int main(int argc, char *argv[])"; marker=marker if marker in s else marker2; assert marker in s, "main nao encontrado"; start=s.index(marker); brace=s.index("{", start)+1; patch="\n    static char direct_app[] = \"javm.nro\";\n    static char direct_jar[] = \"sdmc:/switch/minecraft-nx/capability-test.jar\";\n    static char *direct_argv[] = { direct_app, direct_jar, nullptr };\n    argc = 2;\n    argv = direct_argv;\n"; p.write_text(s[:brace]+patch+s[brace:]); print(p.read_text())'
+          python3 -c 'from pathlib import Path; p=Path("javm-nx-poc/javm/source/Main.cpp"); s=p.read_text(); marker="int main(int argc, char **argv)"; marker2="int main(int argc, char *argv[])"; marker=marker if marker in s else marker2; assert marker in s, "main nao encontrado"; start=s.index(marker); brace=s.index("{", start)+1; patch="\n    static char direct_app[] = \"javm.nro\";\n    static char direct_jar[] = \"sdmc:/switch/minecraft-nx/test.jar\";\n    static char *direct_argv[] = { direct_app, direct_jar, nullptr };\n    argc = 2;\n    argv = direct_argv;\n"; p.write_text(s[:brace]+patch+s[brace:]); print(p.read_text())'
 
       # ============================================================
-      # Compila JavaVM
+      # PAUSA DE DIAGNOSTICO
+      #
+      # Se a VM terminar normalmente, nao fecha imediatamente.
+      # ============================================================
+
+      - name: Patch exit diagnostic
+        shell: bash
+        run: |
+          python3 -c 'from pathlib import Path; p=Path("javm-nx-poc/javm/source/Main.cpp"); s=p.read_text(); old="consoleExit(NULL);"; new="printf(\"\\n[Minecraft-NX] Java retornou ao launcher.\\n\"); printf(\"Created by Farbert_Took\\n\"); printf(\"Use HOME para sair.\\n\"); consoleUpdate(NULL); while (appletMainLoop()) { consoleUpdate(NULL); } consoleExit(NULL);"; assert old in s, "consoleExit nao encontrado"; p.write_text(s.replace(old,new)); print(p.read_text())'
+
+      # ============================================================
+      # Compila javm
       # ============================================================
 
       - name: Build JavaVM
@@ -379,32 +312,32 @@ jobs:
 
           JAVM_NRO=$(find javm-nx-poc/javm -type f -name "javm.nro" | head -n 1)
 
+          TEST_JAR=$(find javm-nx-poc/java-hello-world/target -maxdepth 1 -type f -name "*.jar" | head -n 1)
+
           if [ -z "$JAVM_NRO" ]; then
             echo "ERRO: javm.nro nao encontrado"
             exit 1
           fi
 
-          CAPABILITY_JAR=$(find javm-nx-poc/java-hello-world/target -maxdepth 1 -type f -name "*.jar" | head -n 1)
-
-          if [ -z "$CAPABILITY_JAR" ]; then
-            echo "ERRO: capability JAR nao encontrado"
+          if [ -z "$TEST_JAR" ]; then
+            echo "ERRO: JAR nao encontrado"
             exit 1
           fi
 
           cp \
             "$JAVM_NRO" \
-            SD/switch/minecraft-nx/Minecraft-NX.nro
+            SD/switch/minecraft-nx/javm.nro
 
           cp \
-            "$CAPABILITY_JAR" \
-            SD/switch/minecraft-nx/capability-test.jar
+            "$TEST_JAR" \
+            SD/switch/minecraft-nx/test.jar
 
           echo ""
-          echo "=== Minecraft-NX ==="
+          echo "=== Minecraft-NX Diagnostic v3 ==="
           echo "Created by Farbert_Took"
 
           echo ""
-          echo "=== PACOTE FINAL ==="
+          echo "=== ARQUIVOS ==="
 
           find SD -type f -print
 
@@ -412,39 +345,38 @@ jobs:
       # Verificacao
       # ============================================================
 
-      - name: Verify SD package
+      - name: Verify package
         shell: bash
         run: |
           set -e
 
           test -f \
-            SD/switch/minecraft-nx/Minecraft-NX.nro
+            SD/switch/minecraft-nx/javm.nro
 
           test -f \
-            SD/switch/minecraft-nx/capability-test.jar
-
-          echo "=== Minecraft-NX NRO ==="
-
-          ls -lh \
-            SD/switch/minecraft-nx/Minecraft-NX.nro
+            SD/switch/minecraft-nx/test.jar
 
           echo ""
-          echo "=== Java test ==="
+          echo "=== javm.nro ==="
 
           ls -lh \
-            SD/switch/minecraft-nx/capability-test.jar
+            SD/switch/minecraft-nx/javm.nro
 
           echo ""
-          echo "Minecraft-NX"
-          echo "Created by Farbert_Took"
-          echo "BUILD OK"
+          echo "=== test.jar ==="
+
+          ls -lh \
+            SD/switch/minecraft-nx/test.jar
+
+          echo ""
+          echo "Minecraft-NX Diagnostic v3 OK"
 
       # ============================================================
       # Artifact
       # ============================================================
 
-      - name: Upload Minecraft-NX Java test
+      - name: Upload diagnostic
         uses: actions/upload-artifact@v4
         with:
-          name: Minecraft-NX-Farbert_Took-Java-Test
+          name: Minecraft-NX-Farbert_Took-Diagnostic-v3
           path: SD
