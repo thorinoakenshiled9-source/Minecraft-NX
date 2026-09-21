@@ -45,28 +45,6 @@ jobs:
           sed -i '1i #include <algorithm>' javm-nx-poc/libjavm/libjavm/include/javm/core/core_ClassObject.hpp
           sed -i '1i #include <algorithm>' javm-nx-poc/libjavm/libjavm/include/javm/core/core_ManifestFile.hpp
 
-            - name: Disable old HID
+      - name: Disable old HID
         run: |
-          sed -i '/Input.class.hpp/d' javm-nx-poc/nx/native/nx_Java.hpp
-          sed -i '/LoadNativeClass<hid::Input>/d' javm-nx-poc/nx/native/nx_Java.hpp
-          echo "=== nx_Java.hpp depois do patch ==="
-          cat javm-nx-poc/nx/native/nx_Java.hpp
-
-      - name: Build JavaVM
-        working-directory: javm-nx-poc/javm
-        run: make -j2
-
-      - name: Find NRO
-        run: |
-          find javm-nx-poc -type f -name "*.nro" -print
-
-      - name: Copy JavaVM
-        run: |
-          mkdir -p output
-          find javm-nx-poc -type f -name "*.nro" -exec cp {} output/ \;
-
-      - name: Upload JavaVM
-        uses: actions/upload-artifact@v4
-        with:
-          name: Minecraft-NX-JavaVM
-          path: output
+          sed -
