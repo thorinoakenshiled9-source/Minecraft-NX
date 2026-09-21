@@ -24,7 +24,7 @@ jobs:
           name: Minecraft-NX-nro
           path: Minecraft-NX.nro
 
-  build-javm:
+    build-javm:
     runs-on: ubuntu-latest
     container:
       image: devkitpro/devkita64:latest
@@ -39,13 +39,29 @@ jobs:
         run: |
           git clone --recursive https://github.com/XorTroll/javm-nx-poc.git
 
+      - name: Patch old libjavm
+        run: |
+          sed -i '1i #include <algorithm>' \
+            javm-nx-poc/libjavm/libjavm/include/javm/core/core_ClassObject.hpp
+
+          sed -i '1i #include <algorithm>' \
+            javm-nx-poc/libjavm/libjavm/include/javm/core/core_ManifestFile.hpp
+
+      - name: Disable obsolete HID module
+        run: |
+          sed -i '/#include.*nx\/hid\/Input.class.hpp/d' \
+            javm-nx-poc/nx/native/nx_Java.hpp
+
+          sed -i '/NX_ADD_CLASS.*hid.*Input/d' \
+            javm-nx-poc/nx/native/nx_Java.hpp
+
       - name: Build Java VM
         working-directory: javm-nx-poc/javm
         run: make -j2
 
       - name: Find generated files
         run: |
-          find javm-nx-poc -name "*.nro" -o -name "*.nacp"
+          find javm-nx-poc -type f \( -name "*.nro" -o -name "*.nacp" \) -print
 
       - name: Upload Java VM
         uses: actions/upload-artifact@v4
