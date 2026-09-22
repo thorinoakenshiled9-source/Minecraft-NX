@@ -1,4 +1,4 @@
-name: OpenJDK Horizon Research v3.1
+name: OpenJDK Horizon Research v3.2
 
 on:
   workflow_dispatch:
@@ -32,7 +32,7 @@ jobs:
 
           echo "========================================"
           echo " Minecraft-NX"
-          echo " OpenJDK Horizon Research v3.1"
+          echo " OpenJDK Horizon Research v3.2"
           echo " Created by Farbert_Took"
           echo "========================================"
 
@@ -57,7 +57,7 @@ jobs:
 
           cat > horizon-research/info.txt <<'EOF'
           Minecraft-NX
-          OpenJDK Horizon Research v3.1
+          OpenJDK Horizon Research v3.2
           Created by Farbert_Took
 
           Target: Nintendo Switch Horizon
@@ -77,7 +77,7 @@ jobs:
           - globals_horizon_aarch64.hpp
           - orderAccess_horizon_aarch64.hpp
 
-          v3.1 target:
+          v3.2 target:
           - atomic_horizon_aarch64.hpp
           - inspect next Horizon portability blocker
           EOF
@@ -436,7 +436,7 @@ jobs:
             OBJCOPY="$DEVKITA64/bin/aarch64-none-elf-objcopy" \
             STRIP="$DEVKITA64/bin/aarch64-none-elf-strip" \
             2>&1 \
-            | tee ../horizon-research/configure-v3.1.log
+            | tee ../horizon-research/configure-v3.2.log
 
           STATUS=${PIPESTATUS[0]}
 
@@ -652,11 +652,11 @@ jobs:
         run: |
           set -e
 
-          OUT="horizon-research/os-cpu-aarch64-research-v3.1.txt"
+          OUT="horizon-research/os-cpu-aarch64-research-v3.2.txt"
 
           echo "========================================" > "$OUT"
           echo " Minecraft-NX" >> "$OUT"
-          echo " OS+CPU AArch64 Research v3.1" >> "$OUT"
+          echo " OS+CPU AArch64 Research v3.2" >> "$OUT"
           echo " Created by Farbert_Took" >> "$OUT"
           echo "========================================" >> "$OUT"
           echo "" >> "$OUT"
@@ -789,7 +789,7 @@ jobs:
 
           info = Path(
               "horizon-research/"
-              "os-cpu-strategy-v3.1.txt"
+              "os-cpu-strategy-v3.2.txt"
           )
 
           info.write_text(
@@ -810,11 +810,11 @@ jobs:
         run: |
           set -e
 
-          OUT="horizon-research/orderaccess-research-v3.1.txt"
+          OUT="horizon-research/orderaccess-research-v3.2.txt"
 
           echo "========================================" > "$OUT"
           echo " Minecraft-NX" >> "$OUT"
-          echo " OrderAccess AArch64 Research v3.1" >> "$OUT"
+          echo " OrderAccess AArch64 Research v3.2" >> "$OUT"
           echo " Created by Farbert_Took" >> "$OUT"
           echo "========================================" >> "$OUT"
           echo "" >> "$OUT"
@@ -948,7 +948,7 @@ jobs:
 
           research = Path(
               "horizon-research/"
-              "orderaccess-strategy-v3.1.txt"
+              "orderaccess-strategy-v3.2.txt"
           )
 
           if problems:
@@ -1015,7 +1015,7 @@ jobs:
           PY
 
       # ============================================================
-      # v3.1 research:
+      # v3.2 research:
       # AArch64 Atomic
       # ============================================================
 
@@ -1024,11 +1024,11 @@ jobs:
         run: |
           set -e
 
-          OUT="horizon-research/atomic-research-v3.1.txt"
+          OUT="horizon-research/atomic-research-v3.2.txt"
 
           echo "========================================" > "$OUT"
           echo " Minecraft-NX" >> "$OUT"
-          echo " Atomic AArch64 Research v3.1" >> "$OUT"
+          echo " Atomic AArch64 Research v3.2" >> "$OUT"
           echo " Created by Farbert_Took" >> "$OUT"
           echo "========================================" >> "$OUT"
           echo "" >> "$OUT"
@@ -1167,7 +1167,7 @@ jobs:
 
           research = Path(
               "horizon-research/"
-              "atomic-strategy-v3.1.txt"
+              "atomic-strategy-v3.2.txt"
           )
 
           if problems:
@@ -1183,7 +1183,7 @@ jobs:
               raise SystemExit(
                   "Selected Atomic implementation "
                   "contains OS-specific dependencies. "
-                  "See atomic-strategy-v3.1.txt"
+                  "See atomic-strategy-v3.2.txt"
               )
 
           replacements = {
@@ -1246,7 +1246,7 @@ jobs:
           print(target.read_text())
           PY
       # ============================================================
-      # v3.1 research:
+      # v3.2 research:
       # Horizon Mutex / threading layer
       # ============================================================
 
@@ -1255,11 +1255,11 @@ jobs:
         run: |
           set -e
 
-          OUT="horizon-research/mutex-research-v3.1.txt"
+          OUT="horizon-research/mutex-research-v3.2.txt"
 
           echo "========================================" > "$OUT"
           echo " Minecraft-NX" >> "$OUT"
-          echo " Horizon Mutex Research v3.1" >> "$OUT"
+          echo " Horizon Mutex Research v3.2" >> "$OUT"
           echo " Created by Farbert_Took" >> "$OUT"
           echo "========================================" >> "$OUT"
           echo "" >> "$OUT"
@@ -1329,16 +1329,16 @@ jobs:
           cat "$OUT"
 
       # ============================================================
-      # v3.1 native Horizon/libnx Mutex + CondVar
+      # v3.2 native Horizon/libnx Mutex + CondVar
       # ============================================================
 
       - name: Research libnx synchronization API
         shell: bash
         run: |
           set -e
-          OUT="horizon-research/libnx-sync-research-v3.1.txt"
+          OUT="horizon-research/libnx-sync-research-v3.2.txt"
           {
-            echo "Minecraft-NX - libnx synchronization research v3.1"
+            echo "Minecraft-NX - libnx synchronization research v3.2"
             echo "Created by Farbert_Took"
             echo "===== mutex.h ====="
             sed -n '1,220p' "$DEVKITPRO/libnx/include/switch/kernel/mutex.h"
@@ -1415,8 +1415,8 @@ jobs:
           #endif
           EOF
 
-          cat > horizon-research/mutex-strategy-v3.1.txt <<'EOF'
-          Minecraft-NX / OpenJDK Horizon v3.1
+          cat > horizon-research/mutex-strategy-v3.2.txt <<'EOF'
+          Minecraft-NX / OpenJDK Horizon v3.2
           Created by Farbert_Took
           Decision: NATIVE HORIZON BACKEND
           pthread copy: NO
@@ -1448,7 +1448,7 @@ jobs:
             -I"$DEVKITPRO/libnx/include" \
             -c /tmp/horizon-sync-probe.cpp \
             -o /tmp/horizon-sync-probe.o \
-            2>&1 | tee horizon-research/libnx-sync-probe-v3.1.log
+            2>&1 | tee horizon-research/libnx-sync-probe-v3.2.log
 
           STATUS=${PIPESTATUS[0]}
           echo "$STATUS" > horizon-research/libnx-sync-probe-exit-code.txt
@@ -1460,7 +1460,7 @@ jobs:
           exit 0
 
       # ============================================================
-      # v3.1: Horizon Park/Parker research + native header
+      # v3.2: Horizon Park/Parker research + native header
       # ============================================================
 
       - name: Research HotSpot Park interfaces
@@ -1468,12 +1468,12 @@ jobs:
         run: |
           set -e
 
-          OUT="horizon-research/park-research-v3.1.txt"
+          OUT="horizon-research/park-research-v3.2.txt"
 
           {
             echo "========================================"
             echo " Minecraft-NX"
-            echo " Horizon Park Research v3.1"
+            echo " Horizon Park Research v3.2"
             echo " Created by Farbert_Took"
             echo "========================================"
             echo ""
@@ -1618,8 +1618,8 @@ jobs:
           #endif // OS_HORIZON_PARK_HORIZON_HPP
           EOF
 
-          cat > horizon-research/park-strategy-v3.1.txt <<'EOF'
-          Minecraft-NX / OpenJDK Horizon v3.1
+          cat > horizon-research/park-strategy-v3.2.txt <<'EOF'
+          Minecraft-NX / OpenJDK Horizon v3.2
           Created by Farbert_Took
 
           Decision: NATIVE HORIZON PARK STORAGE
@@ -1635,7 +1635,7 @@ jobs:
           - libnx Mutex
           - two libnx CondVar objects for relative/absolute park channels
 
-          This v3.1 milestone intentionally focuses on satisfying the
+          This v3.2 milestone intentionally focuses on satisfying the
           HotSpot OS header contract and discovering the next compile
           requirement. Passing compilation does not prove park/unpark
           runtime semantics.
@@ -1646,21 +1646,21 @@ jobs:
             openjdk21/src/hotspot/os/horizon/park_horizon.hpp
           echo ""
           echo "===== STRATEGY ====="
-          cat horizon-research/park-strategy-v3.1.txt
+          cat horizon-research/park-strategy-v3.2.txt
 
       # ============================================================
-      # v3.1: Horizon+AArch64 JavaThread OS+CPU header
+      # v3.2: Horizon+AArch64 JavaThread OS+CPU header
       # ============================================================
 
       - name: Research AArch64 JavaThread OS+CPU headers
         shell: bash
         run: |
           set -e
-          OUT="horizon-research/javathread-research-v3.1.txt"
+          OUT="horizon-research/javathread-research-v3.2.txt"
           {
             echo "========================================"
             echo " Minecraft-NX"
-            echo " JavaThread OS+CPU Research v3.1"
+            echo " JavaThread OS+CPU Research v3.2"
             echo " Created by Farbert_Took"
             echo "========================================"
             echo ""
@@ -1698,7 +1698,7 @@ jobs:
 
           root = Path("openjdk21/src/hotspot/os_cpu")
           target = root / "horizon_aarch64/javaThread_horizon_aarch64.hpp"
-          report = Path("horizon-research/javathread-strategy-v3.1.txt")
+          report = Path("horizon-research/javathread-strategy-v3.2.txt")
 
           candidates = [
               p for p in root.glob("*_aarch64/javaThread_*_aarch64.hpp")
@@ -1736,7 +1736,7 @@ jobs:
           hits = [pat for pat in bad if re.search(pat, text)]
 
           lines = [
-              "Minecraft-NX / OpenJDK Horizon v3.1",
+              "Minecraft-NX / OpenJDK Horizon v3.2",
               "Created by Farbert_Took",
               f"Source: {chosen}",
           ]
@@ -1794,7 +1794,7 @@ jobs:
           PY
 
       # ============================================================
-      # v3.1: Horizon Semaphore / WaitBarrier support
+      # v3.2: Horizon Semaphore / WaitBarrier support
       # ============================================================
 
       - name: Research HotSpot Semaphore interfaces
@@ -1802,12 +1802,12 @@ jobs:
         run: |
           set -e
 
-          OUT="horizon-research/semaphore-research-v3.1.txt"
+          OUT="horizon-research/semaphore-research-v3.2.txt"
 
           {
             echo "========================================"
             echo " Minecraft-NX"
-            echo " Horizon Semaphore Research v3.1"
+            echo " Horizon Semaphore Research v3.2"
             echo " Created by Farbert_Took"
             echo "========================================"
             echo ""
@@ -1849,12 +1849,12 @@ jobs:
         run: |
           set -e
 
-          OUT="horizon-research/libnx-semaphore-research-v3.1.txt"
+          OUT="horizon-research/libnx-semaphore-research-v3.2.txt"
 
           {
             echo "========================================"
             echo " Minecraft-NX"
-            echo " libnx Semaphore Primitive Research v3.1"
+            echo " libnx Semaphore Primitive Research v3.2"
             echo " Created by Farbert_Took"
             echo "========================================"
             echo ""
@@ -1990,8 +1990,8 @@ jobs:
           #endif // OS_HORIZON_SEMAPHORE_HORIZON_HPP
           EOF
 
-          cat > horizon-research/semaphore-strategy-v3.1.txt <<'EOF'
-          Minecraft-NX / OpenJDK Horizon v3.1
+          cat > horizon-research/semaphore-strategy-v3.2.txt <<'EOF'
+          Minecraft-NX / OpenJDK Horizon v3.2
           Created by Farbert_Took
 
           Decision: NATIVE HORIZON SEMAPHORE BACKEND
@@ -2019,7 +2019,7 @@ jobs:
 
           echo ""
           echo "===== STRATEGY ====="
-          cat horizon-research/semaphore-strategy-v3.1.txt
+          cat horizon-research/semaphore-strategy-v3.2.txt
 
       - name: Compile standalone libnx semaphore probe
         shell: bash
@@ -2078,7 +2078,7 @@ jobs:
             -I"$DEVKITPRO/libnx/include" \
             -c /tmp/minecraft_nx_semaphore_probe.cpp \
             -o /tmp/minecraft_nx_semaphore_probe.o \
-            > horizon-research/libnx-semaphore-probe-v3.1.txt 2>&1
+            > horizon-research/libnx-semaphore-probe-v3.2.txt 2>&1
           RC=$?
           set -e
 
@@ -2090,13 +2090,165 @@ jobs:
               > horizon-research/libnx-semaphore-probe-result.txt
           fi
 
-          cat horizon-research/libnx-semaphore-probe-v3.1.txt || true
+          cat horizon-research/libnx-semaphore-probe-v3.2.txt || true
           echo "libnx semaphore compile probe: $(
             cat horizon-research/libnx-semaphore-probe-result.txt
           )"
 
           # Research workflow: preserve diagnostics even if the standalone
           # probe fails. The HotSpot build below remains the main oracle.
+
+      # ============================================================
+      # v3.2: Horizon+AArch64 Copy OS+CPU header
+      # ============================================================
+
+      - name: Research AArch64 Copy OS+CPU headers
+        shell: bash
+        run: |
+          set -e
+          OUT="horizon-research/copy-research-v3.2.txt"
+          {
+            echo "========================================"
+            echo " Minecraft-NX"
+            echo " Copy OS+CPU Research v3.2"
+            echo " Created by Farbert_Took"
+            echo "========================================"
+            echo ""
+            echo "===== AARCH64 COPY FRONTEND ====="
+            sed -n '1,360p' openjdk21/src/hotspot/cpu/aarch64/copy_aarch64.hpp
+            echo ""
+            echo "===== COPY OS+CPU HEADERS ====="
+            find openjdk21/src/hotspot/os_cpu \
+              -type f -name 'copy_*_aarch64.hpp' -print | sort
+            echo ""
+            while IFS= read -r FILE; do
+              echo "----------------------------------------"
+              echo "$FILE"
+              echo "----------------------------------------"
+              sed -n '1,420p' "$FILE"
+            done < <(
+              find openjdk21/src/hotspot/os_cpu \
+                -type f -name 'copy_*_aarch64.hpp' -print | sort
+            )
+            echo ""
+            echo "===== OBVIOUS OS RUNTIME DEPENDENCIES ====="
+            grep -RniE \
+              'pthread|futex|syscall|<sys/|<linux/|<unistd|mmap|munmap|mprotect|signal|ucontext' \
+              openjdk21/src/hotspot/os_cpu/*_aarch64/copy_*_aarch64.hpp \
+              2>/dev/null || true
+          } > "$OUT"
+          cat "$OUT"
+
+      - name: Create copy_horizon_aarch64.hpp
+        shell: bash
+        run: |
+          set -e
+          mkdir -p openjdk21/src/hotspot/os_cpu/horizon_aarch64
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path("openjdk21/src/hotspot/os_cpu")
+          target = root / "horizon_aarch64/copy_horizon_aarch64.hpp"
+          report = Path("horizon-research/copy-strategy-v3.2.txt")
+
+          candidates = [
+              p for p in root.glob("*_aarch64/copy_*_aarch64.hpp")
+              if "horizon_aarch64" not in str(p)
+          ]
+
+          def rank(p):
+              q = str(p)
+              if "linux_aarch64" in q:
+                  return 0
+              if "bsd_aarch64" in q:
+                  return 1
+              return 10
+
+          candidates.sort(key=rank)
+
+          if not candidates:
+              report.write_text(
+                  "Minecraft-NX / OpenJDK Horizon v3.2\n"
+                  "Created by Farbert_Took\n"
+                  "Decision: NO AARCH64 COPY REFERENCE FOUND\n"
+              )
+              print(report.read_text())
+              raise SystemExit(1)
+
+          chosen = candidates[0]
+          text = chosen.read_text()
+
+          bad = [
+              r'#include\s*<sys/',
+              r'#include\s*<linux/',
+              r'#include\s*<pthread\.h>',
+              r'#include\s*<unistd\.h>',
+              r'\bpthread_[A-Za-z0-9_]+',
+              r'\bfutex\b',
+              r'\bsyscall\b',
+              r'\bmmap\b',
+              r'\bmunmap\b',
+              r'\bmprotect\b',
+              r'\bucontext_t\b',
+              r'\bsigcontext\b',
+          ]
+          hits = [pat for pat in bad if re.search(pat, text)]
+
+          lines = [
+              "Minecraft-NX / OpenJDK Horizon v3.2",
+              "Created by Farbert_Took",
+              f"Source: {chosen}",
+          ]
+
+          if hits:
+              lines += [
+                  "Decision: REJECTED FOR BLIND COPY",
+                  "Reason: OS runtime dependencies detected",
+                  "Detected:",
+                  *hits,
+                  "",
+                  "Next action:",
+                  "Implement Horizon-specific AArch64 copy semantics.",
+              ]
+              report.write_text("\n".join(lines) + "\n")
+              print(report.read_text())
+              raise SystemExit(1)
+
+          old_platform = chosen.parent.name
+          old_name = chosen.name
+
+          adapted = text
+          adapted = adapted.replace(old_name, "copy_horizon_aarch64.hpp")
+          adapted = adapted.replace(old_platform.upper(), "HORIZON_AARCH64")
+          adapted = adapted.replace(old_platform, "horizon_aarch64")
+          for token in ("LINUX_AARCH64", "BSD_AARCH64"):
+              adapted = adapted.replace(token, "HORIZON_AARCH64")
+
+          banner = """/*
+           * Minecraft-NX - OpenJDK Horizon experimental port
+           * Created by Farbert_Took
+           *
+           * AArch64 Copy structural adaptation.
+           * Accepted only after scanning for obvious OS runtime
+           * dependencies. Compilation is not runtime validation.
+           */
+          """
+          target.write_text(banner + adapted)
+
+          lines += [
+              "Decision: ACCEPTED AS AARCH64 STRUCTURAL REFERENCE",
+              "Linux/POSIX runtime dependency scan: CLEAN",
+              f"Target: {target}",
+              "",
+              "Semantics status:",
+              "Experimental; compile success is not runtime validation.",
+          ]
+          report.write_text("\n".join(lines) + "\n")
+          print(report.read_text())
+          print(target.read_text())
+          PY
 
       # ============================================================
       # Inject Horizon identity + include layers
@@ -2109,7 +2261,7 @@ jobs:
 
           cat >> "$OPENJDK_SPEC" <<'EOF'
 
-          # Minecraft-NX OpenJDK Horizon v3.1
+          # Minecraft-NX OpenJDK Horizon v3.2
 
           CFLAGS += -DMINECRAFT_NX_HORIZON=1
           CXXFLAGS += -DMINECRAFT_NX_HORIZON=1
@@ -2197,6 +2349,10 @@ jobs:
             openjdk21/src/hotspot/os/horizon/semaphore_horizon.hpp
 
 
+          test -f \
+            openjdk21/src/hotspot/os_cpu/horizon_aarch64/copy_horizon_aarch64.hpp
+
+
           echo "===== HORIZON OS ====="
 
           find \
@@ -2220,7 +2376,7 @@ jobs:
       # Probe HotSpot
       # ============================================================
 
-      - name: Probe HotSpot v3.1
+      - name: Probe HotSpot v3.2
         shell: bash
         run: |
           set +e
@@ -2242,7 +2398,7 @@ jobs:
             LOG=trace \
             hotspot \
             2>&1 \
-            | tee ../horizon-research/hotspot-build-v3.1.log
+            | tee ../horizon-research/hotspot-build-v3.2.log
 
           STATUS=${PIPESTATUS[0]}
 
@@ -2255,7 +2411,7 @@ jobs:
       # Analyze next failure
       # ============================================================
 
-      - name: Analyze HotSpot v3.1
+      - name: Analyze HotSpot v3.2
         shell: bash
         run: |
           set +e
@@ -2265,7 +2421,7 @@ jobs:
           import re
 
           log_path = Path(
-              "horizon-research/hotspot-build-v3.1.log"
+              "horizon-research/hotspot-build-v3.2.log"
           )
 
           if not log_path.exists():
@@ -2364,6 +2520,13 @@ jobs:
               "No such file or directory" in text
           )
 
+
+          result(
+              "copy-result.txt",
+              "fatal error: copy_horizon_aarch64.hpp: "
+              "No such file or directory" in text
+          )
+
           missing = []
 
           for m in re.findall(
@@ -2377,7 +2540,7 @@ jobs:
 
           Path(
               "horizon-research/"
-              "missing-horizon-headers-v3.1.txt"
+              "missing-horizon-headers-v3.2.txt"
           ).write_text(
               (
                   "\n".join(missing) + "\n"
@@ -2464,7 +2627,7 @@ jobs:
           out = [
               "========================================",
               " Minecraft-NX",
-              " HOTSPOT DIAGNOSTIC v3.1",
+              " HOTSPOT DIAGNOSTIC v3.2",
               " Created by Farbert_Took",
               "========================================",
               "",
@@ -2503,7 +2666,7 @@ jobs:
               ]
 
           Path(
-              "horizon-research/diagnostic-v3.1.txt"
+              "horizon-research/diagnostic-v3.2.txt"
           ).write_text(
               "\n".join(out) + "\n"
           )
@@ -2528,7 +2691,7 @@ jobs:
 
           Path(
               "horizon-research/"
-              "portability-errors-v3.1.txt"
+              "portability-errors-v3.2.txt"
           ).write_text(
               (
                   "\n".join(portability[:150]) + "\n"
@@ -2540,8 +2703,8 @@ jobs:
 
           tail \
             -n 300 \
-            horizon-research/hotspot-build-v3.1.log \
-            > horizon-research/hotspot-last-300-v3.1.txt \
+            horizon-research/hotspot-build-v3.2.log \
+            > horizon-research/hotspot-last-300-v3.2.txt \
             2>/dev/null \
             || true
 
@@ -2573,7 +2736,7 @@ jobs:
             || true
 
           git -C openjdk21 diff \
-            > horizon-research/openjdk-horizon-v3.1.patch
+            > horizon-research/openjdk-horizon-v3.2.patch
 
           exit 0
 
@@ -2659,6 +2822,12 @@ jobs:
             2>/dev/null || echo unknown
           )
 
+
+          COPY=$(
+            cat horizon-research/copy-result.txt \
+            2>/dev/null || echo unknown
+          )
+
           SEMAPHORE_PROBE=$(
             cat horizon-research/libnx-semaphore-probe-result.txt \
             2>/dev/null || echo unknown
@@ -2671,7 +2840,7 @@ jobs:
 
           echo ""
           echo "========================================"
-          echo " Minecraft-NX v3.1 COMPACT RESULT"
+          echo " Minecraft-NX v3.2 COMPACT RESULT"
           echo " Created by Farbert_Took"
           echo "========================================"
           echo ""
@@ -2690,6 +2859,7 @@ jobs:
           echo "park_horizon blocker: $PARK"
           echo "javaThread_horizon_aarch64 blocker: $JAVATHREAD"
           echo "semaphore_horizon blocker: $SEMAPHORE"
+          echo "copy_horizon_aarch64 blocker: $COPY"
           echo "libnx semaphore compile probe: $SEMAPHORE_PROBE"
           echo "libnx sync compile probe: $SYNC_PROBE"
 
@@ -2698,7 +2868,7 @@ jobs:
           echo ""
 
           cat \
-            horizon-research/os-cpu-strategy-v3.1.txt \
+            horizon-research/os-cpu-strategy-v3.2.txt \
             2>/dev/null \
             || true
 
@@ -2707,7 +2877,7 @@ jobs:
           echo ""
 
           cat \
-            horizon-research/orderaccess-strategy-v3.1.txt \
+            horizon-research/orderaccess-strategy-v3.2.txt \
             2>/dev/null \
             || true
 
@@ -2716,7 +2886,7 @@ jobs:
           echo ""
 
           cat \
-            horizon-research/atomic-strategy-v3.1.txt \
+            horizon-research/atomic-strategy-v3.2.txt \
             2>/dev/null \
             || true
 
@@ -2725,7 +2895,7 @@ jobs:
           echo ""
 
           cat \
-            horizon-research/mutex-strategy-v3.1.txt \
+            horizon-research/mutex-strategy-v3.2.txt \
             2>/dev/null \
             || true
 
@@ -2735,7 +2905,7 @@ jobs:
           echo ""
 
           cat \
-            horizon-research/park-strategy-v3.1.txt \
+            horizon-research/park-strategy-v3.2.txt \
             2>/dev/null \
             || true
 
@@ -2745,7 +2915,7 @@ jobs:
           echo ""
 
           cat \
-            horizon-research/javathread-strategy-v3.1.txt \
+            horizon-research/javathread-strategy-v3.2.txt \
             2>/dev/null \
             || true
 
@@ -2755,7 +2925,17 @@ jobs:
           echo ""
 
           cat \
-            horizon-research/semaphore-strategy-v3.1.txt \
+            horizon-research/semaphore-strategy-v3.2.txt \
+            2>/dev/null \
+            || true
+
+
+          echo ""
+          echo "===== COPY OS+CPU STRATEGY ====="
+          echo ""
+
+          cat \
+            horizon-research/copy-strategy-v3.2.txt \
             2>/dev/null \
             || true
 
@@ -2764,7 +2944,7 @@ jobs:
           echo ""
 
           cat \
-            horizon-research/missing-horizon-headers-v3.1.txt \
+            horizon-research/missing-horizon-headers-v3.2.txt \
             2>/dev/null \
             || true
 
@@ -2773,7 +2953,7 @@ jobs:
           echo ""
 
           sed -n '1,150p' \
-            horizon-research/diagnostic-v3.1.txt \
+            horizon-research/diagnostic-v3.2.txt \
             2>/dev/null \
             || true
 
@@ -2782,19 +2962,19 @@ jobs:
           echo ""
 
           sed -n '1,100p' \
-            horizon-research/portability-errors-v3.1.txt \
+            horizon-research/portability-errors-v3.2.txt \
             2>/dev/null \
             || true
 
           echo ""
           echo "========================================"
-          echo " END Minecraft-NX v3.1"
+          echo " END Minecraft-NX v3.2"
           echo "========================================"
 
           exit 0
 
-      - name: Upload Horizon Research v3.1
+      - name: Upload Horizon Research v3.2
         uses: actions/upload-artifact@v4
         with:
-          name: Minecraft-NX-Farbert_Took-OpenJDK-Horizon-v3.1
+          name: Minecraft-NX-Farbert_Took-OpenJDK-Horizon-v3.2
           path: horizon-research
