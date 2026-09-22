@@ -1,4 +1,4 @@
-name: OpenJDK Horizon Research v2.6
+name: OpenJDK Horizon Research v2.7
 
 on:
   workflow_dispatch:
@@ -32,7 +32,7 @@ jobs:
 
           echo "========================================"
           echo " Minecraft-NX"
-          echo " OpenJDK Horizon Research v2.6"
+          echo " OpenJDK Horizon Research v2.7"
           echo " Created by Farbert_Took"
           echo "========================================"
 
@@ -57,7 +57,7 @@ jobs:
 
           cat > horizon-research/info.txt <<'EOF'
           Minecraft-NX
-          OpenJDK Horizon Research v2.6
+          OpenJDK Horizon Research v2.7
           Created by Farbert_Took
 
           Target: Nintendo Switch Horizon
@@ -77,7 +77,7 @@ jobs:
           - globals_horizon_aarch64.hpp
           - orderAccess_horizon_aarch64.hpp
 
-          v2.6 target:
+          v2.7 target:
           - atomic_horizon_aarch64.hpp
           - inspect next Horizon portability blocker
           EOF
@@ -436,7 +436,7 @@ jobs:
             OBJCOPY="$DEVKITA64/bin/aarch64-none-elf-objcopy" \
             STRIP="$DEVKITA64/bin/aarch64-none-elf-strip" \
             2>&1 \
-            | tee ../horizon-research/configure-v2.6.log
+            | tee ../horizon-research/configure-v2.7.log
 
           STATUS=${PIPESTATUS[0]}
 
@@ -652,11 +652,11 @@ jobs:
         run: |
           set -e
 
-          OUT="horizon-research/os-cpu-aarch64-research-v2.6.txt"
+          OUT="horizon-research/os-cpu-aarch64-research-v2.7.txt"
 
           echo "========================================" > "$OUT"
           echo " Minecraft-NX" >> "$OUT"
-          echo " OS+CPU AArch64 Research v2.6" >> "$OUT"
+          echo " OS+CPU AArch64 Research v2.7" >> "$OUT"
           echo " Created by Farbert_Took" >> "$OUT"
           echo "========================================" >> "$OUT"
           echo "" >> "$OUT"
@@ -789,7 +789,7 @@ jobs:
 
           info = Path(
               "horizon-research/"
-              "os-cpu-strategy-v2.6.txt"
+              "os-cpu-strategy-v2.7.txt"
           )
 
           info.write_text(
@@ -810,11 +810,11 @@ jobs:
         run: |
           set -e
 
-          OUT="horizon-research/orderaccess-research-v2.6.txt"
+          OUT="horizon-research/orderaccess-research-v2.7.txt"
 
           echo "========================================" > "$OUT"
           echo " Minecraft-NX" >> "$OUT"
-          echo " OrderAccess AArch64 Research v2.6" >> "$OUT"
+          echo " OrderAccess AArch64 Research v2.7" >> "$OUT"
           echo " Created by Farbert_Took" >> "$OUT"
           echo "========================================" >> "$OUT"
           echo "" >> "$OUT"
@@ -948,7 +948,7 @@ jobs:
 
           research = Path(
               "horizon-research/"
-              "orderaccess-strategy-v2.6.txt"
+              "orderaccess-strategy-v2.7.txt"
           )
 
           if problems:
@@ -1015,7 +1015,7 @@ jobs:
           PY
 
       # ============================================================
-      # v2.6 research:
+      # v2.7 research:
       # AArch64 Atomic
       # ============================================================
 
@@ -1024,11 +1024,11 @@ jobs:
         run: |
           set -e
 
-          OUT="horizon-research/atomic-research-v2.6.txt"
+          OUT="horizon-research/atomic-research-v2.7.txt"
 
           echo "========================================" > "$OUT"
           echo " Minecraft-NX" >> "$OUT"
-          echo " Atomic AArch64 Research v2.6" >> "$OUT"
+          echo " Atomic AArch64 Research v2.7" >> "$OUT"
           echo " Created by Farbert_Took" >> "$OUT"
           echo "========================================" >> "$OUT"
           echo "" >> "$OUT"
@@ -1167,7 +1167,7 @@ jobs:
 
           research = Path(
               "horizon-research/"
-              "atomic-strategy-v2.6.txt"
+              "atomic-strategy-v2.7.txt"
           )
 
           if problems:
@@ -1183,7 +1183,7 @@ jobs:
               raise SystemExit(
                   "Selected Atomic implementation "
                   "contains OS-specific dependencies. "
-                  "See atomic-strategy-v2.6.txt"
+                  "See atomic-strategy-v2.7.txt"
               )
 
           replacements = {
@@ -1245,7 +1245,330 @@ jobs:
 
           print(target.read_text())
           PY
+      # ============================================================
+      # v2.7 research:
+      # Horizon Mutex / threading layer
+      # ============================================================
 
+      - name: Research Horizon Mutex
+        shell: bash
+        run: |
+          set -e
+
+          OUT="horizon-research/mutex-research-v2.7.txt"
+
+          echo "========================================" > "$OUT"
+          echo " Minecraft-NX" >> "$OUT"
+          echo " Horizon Mutex Research v2.7" >> "$OUT"
+          echo " Created by Farbert_Took" >> "$OUT"
+          echo "========================================" >> "$OUT"
+          echo "" >> "$OUT"
+
+          echo "===== HOTSPOT MUTEX PLATFORM HEADERS =====" >> "$OUT"
+          echo "" >> "$OUT"
+
+          find openjdk21/src/hotspot \
+            -type f \
+            -name 'mutex_*.hpp' \
+            -print \
+            | sort \
+            >> "$OUT" \
+            || true
+
+          echo "" >> "$OUT"
+          echo "===== HOTSPOT MUTEX PLATFORM SOURCES =====" >> "$OUT"
+          echo "" >> "$OUT"
+
+          find openjdk21/src/hotspot \
+            -type f \
+            \( \
+              -name 'mutex_*.cpp' \
+              -o \
+              -name 'mutex_*.c' \
+            \) \
+            -print \
+            | sort \
+            >> "$OUT" \
+            || true
+
+          echo "" >> "$OUT"
+          echo "===== MUTEX HEADER CONTENTS =====" >> "$OUT"
+
+          while IFS= read -r FILE
+          do
+            echo "" >> "$OUT"
+            echo "----------------------------------------" >> "$OUT"
+            echo "$FILE" >> "$OUT"
+            echo "----------------------------------------" >> "$OUT"
+
+            cat "$FILE" >> "$OUT"
+
+          done < <(
+            find openjdk21/src/hotspot \
+              -type f \
+              -name 'mutex_*.hpp' \
+              -print \
+              | sort
+          )
+
+          echo "" >> "$OUT"
+          echo "===== POSIX / PTHREAD / FUTEX REFERENCES =====" >> "$OUT"
+          echo "" >> "$OUT"
+
+          grep \
+            -R -n -E \
+            'pthread_|futex|syscall|unistd\.h|linux/|sys/' \
+            openjdk21/src/hotspot/os \
+            openjdk21/src/hotspot/os_cpu \
+            --include='mutex_*.hpp' \
+            --include='mutex_*.cpp' \
+            2>/dev/null \
+            >> "$OUT" \
+            || true
+
+          cat "$OUT"
+
+      # ============================================================
+      # Create mutex_horizon.hpp
+      #
+      # Unlike globals/orderAccess/atomic, this is an OS header.
+      #
+      # We inspect upstream implementations first and only accept a
+      # reference header when it contains no obvious Linux/POSIX
+      # runtime dependency.
+      #
+      # If the available implementation requires pthread/futex/etc,
+      # this step deliberately stops instead of pretending Horizon
+      # is Linux.
+      # ============================================================
+
+      - name: Create mutex_horizon.hpp
+        shell: bash
+        run: |
+          set -e
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path("openjdk21/src/hotspot")
+
+          dst = (
+              root /
+              "os" /
+              "horizon"
+          )
+
+          dst.mkdir(
+              parents=True,
+              exist_ok=True
+          )
+
+          target = (
+              dst /
+              "mutex_horizon.hpp"
+          )
+
+          candidates = []
+
+          for pattern in [
+              "os/*/mutex_*.hpp",
+              "os_cpu/*/mutex_*.hpp",
+          ]:
+              candidates.extend(
+                  root.glob(pattern)
+              )
+
+          candidates = [
+              p for p in candidates
+              if "/horizon/" not in str(p)
+              and "horizon_" not in p.name
+          ]
+
+          print("Mutex candidates:")
+
+          for candidate in candidates:
+              print(" ", candidate)
+
+          preferred = [
+              root / "os" / "posix" /
+              "mutex_posix.hpp",
+
+              root / "os" / "linux" /
+              "mutex_linux.hpp",
+
+              root / "os" / "bsd" /
+              "mutex_bsd.hpp",
+          ]
+
+          source = None
+
+          for candidate in preferred:
+              if candidate.exists():
+                  source = candidate
+                  break
+
+          if source is None and candidates:
+              source = candidates[0]
+
+          strategy = Path(
+              "horizon-research/"
+              "mutex-strategy-v2.7.txt"
+          )
+
+          if source is None:
+              strategy.write_text(
+                  "Decision: NO REFERENCE HEADER FOUND\n"
+              )
+
+              raise SystemExit(
+                  "No upstream HotSpot mutex OS header found."
+              )
+
+          data = source.read_text(
+              errors="replace"
+          )
+
+          forbidden_patterns = {
+              "pthread header":
+                  r'#include\s*<pthread\.h>',
+
+              "pthread API":
+                  r'\bpthread_[A-Za-z0-9_]+',
+
+              "Linux header":
+                  r'#include\s*<linux/',
+
+              "sys header":
+                  r'#include\s*<sys/',
+
+              "unistd":
+                  r'#include\s*<unistd\.h>',
+
+              "futex":
+                  r'\bfutex\b',
+
+              "syscall":
+                  r'\bsyscall\s*\(',
+
+              "__linux__":
+                  r'\b__linux__\b',
+
+              "mmap":
+                  r'\bmmap\s*\(',
+
+              "munmap":
+                  r'\bmunmap\s*\(',
+          }
+
+          problems = []
+
+          for label, pattern in forbidden_patterns.items():
+              if re.search(
+                  pattern,
+                  data
+              ):
+                  problems.append(
+                      label + ": " + pattern
+                  )
+
+          if problems:
+              strategy.write_text(
+                  "Source: " + str(source) + "\n"
+                  "Decision: REJECTED\n"
+                  "Reason: OS runtime dependencies detected\n"
+                  "Detected:\n"
+                  + "\n".join(problems)
+                  + "\n"
+                  "\n"
+                  "Next action:\n"
+                  "Implement Horizon mutex semantics using "
+                  "Horizon/libnx synchronization primitives.\n"
+              )
+
+              print(
+                  strategy.read_text()
+              )
+
+              raise SystemExit(
+                  "Mutex reference requires OS-specific "
+                  "synchronization. Refusing blind copy."
+              )
+
+          replacements = {
+              "mutex_linux.hpp":
+                  "mutex_horizon.hpp",
+
+              "mutex_posix.hpp":
+                  "mutex_horizon.hpp",
+
+              "mutex_bsd.hpp":
+                  "mutex_horizon.hpp",
+
+              "MUTEX_LINUX_HPP":
+                  "MUTEX_HORIZON_HPP",
+
+              "MUTEX_POSIX_HPP":
+                  "MUTEX_HORIZON_HPP",
+
+              "MUTEX_BSD_HPP":
+                  "MUTEX_HORIZON_HPP",
+
+              "OS_LINUX_MUTEX_LINUX_HPP":
+                  "OS_HORIZON_MUTEX_HORIZON_HPP",
+
+              "OS_POSIX_MUTEX_POSIX_HPP":
+                  "OS_HORIZON_MUTEX_HORIZON_HPP",
+
+              "OS_BSD_MUTEX_BSD_HPP":
+                  "OS_HORIZON_MUTEX_HORIZON_HPP",
+          }
+
+          for old, new in replacements.items():
+              data = data.replace(
+                  old,
+                  new
+              )
+
+          banner = '''/*
+           * Minecraft-NX
+           * OpenJDK Horizon experimental port
+           * Created by Farbert_Took
+           *
+           * Horizon HotSpot mutex platform header.
+           *
+           * This file was generated only after rejecting
+           * obvious pthread/Linux/futex dependencies.
+           *
+           * Horizon remains a distinct OS target.
+           */
+
+          '''
+
+          target.write_text(
+              banner + data
+          )
+
+          strategy.write_text(
+              "Source: " + str(source) + "\n"
+              "Decision: ACCEPTED AS STRUCTURAL REFERENCE\n"
+              "Target: " + str(target) + "\n"
+              "OS runtime dependency scan: CLEAN\n"
+          )
+
+          print("")
+          print(
+              strategy.read_text()
+          )
+
+          print(
+              "===== mutex_horizon.hpp ====="
+          )
+
+          print(
+              target.read_text()
+          )
+          PY
       # ============================================================
       # Inject Horizon identity + include layers
       # ============================================================
@@ -1257,7 +1580,7 @@ jobs:
 
           cat >> "$OPENJDK_SPEC" <<'EOF'
 
-          # Minecraft-NX OpenJDK Horizon v2.6
+          # Minecraft-NX OpenJDK Horizon v2.7
 
           CFLAGS += -DMINECRAFT_NX_HORIZON=1
           CXXFLAGS += -DMINECRAFT_NX_HORIZON=1
@@ -1306,6 +1629,10 @@ jobs:
 
           test -f \
             openjdk21/src/hotspot/os_cpu/horizon_aarch64/atomic_horizon_aarch64.hpp
+           
+          test -f \
+            openjdk21/src/hotspot/os/horizon/mutex_horizon.hpp
+
 
           echo "===== HORIZON OS ====="
 
@@ -1330,7 +1657,7 @@ jobs:
       # Probe HotSpot
       # ============================================================
 
-      - name: Probe HotSpot v2.6
+      - name: Probe HotSpot v2.7
         shell: bash
         run: |
           set +e
@@ -1352,7 +1679,7 @@ jobs:
             LOG=trace \
             hotspot \
             2>&1 \
-            | tee ../horizon-research/hotspot-build-v2.6.log
+            | tee ../horizon-research/hotspot-build-v2.7.log
 
           STATUS=${PIPESTATUS[0]}
 
@@ -1365,7 +1692,7 @@ jobs:
       # Analyze next failure
       # ============================================================
 
-      - name: Analyze HotSpot v2.6
+      - name: Analyze HotSpot v2.7
         shell: bash
         run: |
           set +e
@@ -1375,7 +1702,7 @@ jobs:
           import re
 
           log_path = Path(
-              "horizon-research/hotspot-build-v2.6.log"
+              "horizon-research/hotspot-build-v2.7.log"
           )
 
           if not log_path.exists():
@@ -1446,6 +1773,12 @@ jobs:
               "fatal error: atomic_horizon_aarch64.hpp: "
               "No such file or directory" in text
           )
+          
+          result(
+              "mutex-result.txt",
+              "fatal error: mutex_horizon.hpp: "
+              "No such file or directory" in text
+          )
 
           missing = []
 
@@ -1460,7 +1793,7 @@ jobs:
 
           Path(
               "horizon-research/"
-              "missing-horizon-headers-v2.6.txt"
+              "missing-horizon-headers-v2.7.txt"
           ).write_text(
               (
                   "\n".join(missing) + "\n"
@@ -1547,7 +1880,7 @@ jobs:
           out = [
               "========================================",
               " Minecraft-NX",
-              " HOTSPOT DIAGNOSTIC v2.6",
+              " HOTSPOT DIAGNOSTIC v2.7",
               " Created by Farbert_Took",
               "========================================",
               "",
@@ -1586,7 +1919,7 @@ jobs:
               ]
 
           Path(
-              "horizon-research/diagnostic-v2.6.txt"
+              "horizon-research/diagnostic-v2.7.txt"
           ).write_text(
               "\n".join(out) + "\n"
           )
@@ -1611,7 +1944,7 @@ jobs:
 
           Path(
               "horizon-research/"
-              "portability-errors-v2.6.txt"
+              "portability-errors-v2.7.txt"
           ).write_text(
               (
                   "\n".join(portability[:150]) + "\n"
@@ -1623,8 +1956,8 @@ jobs:
 
           tail \
             -n 300 \
-            horizon-research/hotspot-build-v2.6.log \
-            > horizon-research/hotspot-last-300-v2.6.txt \
+            horizon-research/hotspot-build-v2.7.log \
+            > horizon-research/hotspot-last-300-v2.7.txt \
             2>/dev/null \
             || true
 
@@ -1656,7 +1989,7 @@ jobs:
             || true
 
           git -C openjdk21 diff \
-            > horizon-research/openjdk-horizon-v2.6.patch
+            > horizon-research/openjdk-horizon-v2.7.patch
 
           exit 0
 
@@ -1718,10 +2051,15 @@ jobs:
             cat horizon-research/atomic-result.txt \
             2>/dev/null || echo unknown
           )
+          
+          MUTEX=$(
+            cat horizon-research/mutex-result.txt \
+            2>/dev/null || echo unknown
+          )
 
           echo ""
           echo "========================================"
-          echo " Minecraft-NX v2.6 COMPACT RESULT"
+          echo " Minecraft-NX v2.7 COMPACT RESULT"
           echo " Created by Farbert_Took"
           echo "========================================"
           echo ""
@@ -1736,13 +2074,14 @@ jobs:
           echo "globals_horizon_aarch64 blocker: $OSCPU"
           echo "orderAccess_horizon_aarch64 blocker: $ORDERACCESS"
           echo "atomic_horizon_aarch64 blocker: $ATOMIC"
+          echo "mutex_horizon blocker: $MUTEX"
 
           echo ""
           echo "===== OS+CPU STRATEGY ====="
           echo ""
 
           cat \
-            horizon-research/os-cpu-strategy-v2.6.txt \
+            horizon-research/os-cpu-strategy-v2.7.txt \
             2>/dev/null \
             || true
 
@@ -1751,7 +2090,7 @@ jobs:
           echo ""
 
           cat \
-            horizon-research/orderaccess-strategy-v2.6.txt \
+            horizon-research/orderaccess-strategy-v2.7.txt \
             2>/dev/null \
             || true
 
@@ -1760,7 +2099,16 @@ jobs:
           echo ""
 
           cat \
-            horizon-research/atomic-strategy-v2.6.txt \
+            horizon-research/atomic-strategy-v2.7.txt \
+            2>/dev/null \
+            || true
+
+          echo ""
+          echo "===== MUTEX STRATEGY ====="
+          echo ""
+
+          cat \
+            horizon-research/mutex-strategy-v2.7.txt \
             2>/dev/null \
             || true
 
@@ -1769,7 +2117,7 @@ jobs:
           echo ""
 
           cat \
-            horizon-research/missing-horizon-headers-v2.6.txt \
+            horizon-research/missing-horizon-headers-v2.7.txt \
             2>/dev/null \
             || true
 
@@ -1778,7 +2126,7 @@ jobs:
           echo ""
 
           sed -n '1,150p' \
-            horizon-research/diagnostic-v2.6.txt \
+            horizon-research/diagnostic-v2.7.txt \
             2>/dev/null \
             || true
 
@@ -1787,19 +2135,19 @@ jobs:
           echo ""
 
           sed -n '1,100p' \
-            horizon-research/portability-errors-v2.6.txt \
+            horizon-research/portability-errors-v2.7.txt \
             2>/dev/null \
             || true
 
           echo ""
           echo "========================================"
-          echo " END Minecraft-NX v2.6"
+          echo " END Minecraft-NX v2.7"
           echo "========================================"
 
           exit 0
 
-      - name: Upload Horizon Research v2.6
+      - name: Upload Horizon Research v2.7
         uses: actions/upload-artifact@v4
         with:
-          name: Minecraft-NX-Farbert_Took-OpenJDK-Horizon-v2.6
+          name: Minecraft-NX-Farbert_Took-OpenJDK-Horizon-v2.7
           path: horizon-research
