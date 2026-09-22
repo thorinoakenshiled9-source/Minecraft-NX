@@ -1,4 +1,4 @@
-name: OpenJDK Horizon Research v2.8
+name: OpenJDK Horizon Research v2.9
 
 on:
   workflow_dispatch:
@@ -32,7 +32,7 @@ jobs:
 
           echo "========================================"
           echo " Minecraft-NX"
-          echo " OpenJDK Horizon Research v2.8"
+          echo " OpenJDK Horizon Research v2.9"
           echo " Created by Farbert_Took"
           echo "========================================"
 
@@ -57,7 +57,7 @@ jobs:
 
           cat > horizon-research/info.txt <<'EOF'
           Minecraft-NX
-          OpenJDK Horizon Research v2.8
+          OpenJDK Horizon Research v2.9
           Created by Farbert_Took
 
           Target: Nintendo Switch Horizon
@@ -77,7 +77,7 @@ jobs:
           - globals_horizon_aarch64.hpp
           - orderAccess_horizon_aarch64.hpp
 
-          v2.8 target:
+          v2.9 target:
           - atomic_horizon_aarch64.hpp
           - inspect next Horizon portability blocker
           EOF
@@ -436,7 +436,7 @@ jobs:
             OBJCOPY="$DEVKITA64/bin/aarch64-none-elf-objcopy" \
             STRIP="$DEVKITA64/bin/aarch64-none-elf-strip" \
             2>&1 \
-            | tee ../horizon-research/configure-v2.8.log
+            | tee ../horizon-research/configure-v2.9.log
 
           STATUS=${PIPESTATUS[0]}
 
@@ -652,11 +652,11 @@ jobs:
         run: |
           set -e
 
-          OUT="horizon-research/os-cpu-aarch64-research-v2.8.txt"
+          OUT="horizon-research/os-cpu-aarch64-research-v2.9.txt"
 
           echo "========================================" > "$OUT"
           echo " Minecraft-NX" >> "$OUT"
-          echo " OS+CPU AArch64 Research v2.8" >> "$OUT"
+          echo " OS+CPU AArch64 Research v2.9" >> "$OUT"
           echo " Created by Farbert_Took" >> "$OUT"
           echo "========================================" >> "$OUT"
           echo "" >> "$OUT"
@@ -789,7 +789,7 @@ jobs:
 
           info = Path(
               "horizon-research/"
-              "os-cpu-strategy-v2.8.txt"
+              "os-cpu-strategy-v2.9.txt"
           )
 
           info.write_text(
@@ -810,11 +810,11 @@ jobs:
         run: |
           set -e
 
-          OUT="horizon-research/orderaccess-research-v2.8.txt"
+          OUT="horizon-research/orderaccess-research-v2.9.txt"
 
           echo "========================================" > "$OUT"
           echo " Minecraft-NX" >> "$OUT"
-          echo " OrderAccess AArch64 Research v2.8" >> "$OUT"
+          echo " OrderAccess AArch64 Research v2.9" >> "$OUT"
           echo " Created by Farbert_Took" >> "$OUT"
           echo "========================================" >> "$OUT"
           echo "" >> "$OUT"
@@ -948,7 +948,7 @@ jobs:
 
           research = Path(
               "horizon-research/"
-              "orderaccess-strategy-v2.8.txt"
+              "orderaccess-strategy-v2.9.txt"
           )
 
           if problems:
@@ -1015,7 +1015,7 @@ jobs:
           PY
 
       # ============================================================
-      # v2.8 research:
+      # v2.9 research:
       # AArch64 Atomic
       # ============================================================
 
@@ -1024,11 +1024,11 @@ jobs:
         run: |
           set -e
 
-          OUT="horizon-research/atomic-research-v2.8.txt"
+          OUT="horizon-research/atomic-research-v2.9.txt"
 
           echo "========================================" > "$OUT"
           echo " Minecraft-NX" >> "$OUT"
-          echo " Atomic AArch64 Research v2.8" >> "$OUT"
+          echo " Atomic AArch64 Research v2.9" >> "$OUT"
           echo " Created by Farbert_Took" >> "$OUT"
           echo "========================================" >> "$OUT"
           echo "" >> "$OUT"
@@ -1167,7 +1167,7 @@ jobs:
 
           research = Path(
               "horizon-research/"
-              "atomic-strategy-v2.8.txt"
+              "atomic-strategy-v2.9.txt"
           )
 
           if problems:
@@ -1183,7 +1183,7 @@ jobs:
               raise SystemExit(
                   "Selected Atomic implementation "
                   "contains OS-specific dependencies. "
-                  "See atomic-strategy-v2.8.txt"
+                  "See atomic-strategy-v2.9.txt"
               )
 
           replacements = {
@@ -1246,7 +1246,7 @@ jobs:
           print(target.read_text())
           PY
       # ============================================================
-      # v2.8 research:
+      # v2.9 research:
       # Horizon Mutex / threading layer
       # ============================================================
 
@@ -1255,11 +1255,11 @@ jobs:
         run: |
           set -e
 
-          OUT="horizon-research/mutex-research-v2.8.txt"
+          OUT="horizon-research/mutex-research-v2.9.txt"
 
           echo "========================================" > "$OUT"
           echo " Minecraft-NX" >> "$OUT"
-          echo " Horizon Mutex Research v2.8" >> "$OUT"
+          echo " Horizon Mutex Research v2.9" >> "$OUT"
           echo " Created by Farbert_Took" >> "$OUT"
           echo "========================================" >> "$OUT"
           echo "" >> "$OUT"
@@ -1329,16 +1329,16 @@ jobs:
           cat "$OUT"
 
       # ============================================================
-      # v2.8 native Horizon/libnx Mutex + CondVar
+      # v2.9 native Horizon/libnx Mutex + CondVar
       # ============================================================
 
       - name: Research libnx synchronization API
         shell: bash
         run: |
           set -e
-          OUT="horizon-research/libnx-sync-research-v2.8.txt"
+          OUT="horizon-research/libnx-sync-research-v2.9.txt"
           {
-            echo "Minecraft-NX - libnx synchronization research v2.8"
+            echo "Minecraft-NX - libnx synchronization research v2.9"
             echo "Created by Farbert_Took"
             echo "===== mutex.h ====="
             sed -n '1,220p' "$DEVKITPRO/libnx/include/switch/kernel/mutex.h"
@@ -1415,8 +1415,8 @@ jobs:
           #endif
           EOF
 
-          cat > horizon-research/mutex-strategy-v2.8.txt <<'EOF'
-          Minecraft-NX / OpenJDK Horizon v2.8
+          cat > horizon-research/mutex-strategy-v2.9.txt <<'EOF'
+          Minecraft-NX / OpenJDK Horizon v2.9
           Created by Farbert_Took
           Decision: NATIVE HORIZON BACKEND
           pthread copy: NO
@@ -1448,7 +1448,7 @@ jobs:
             -I"$DEVKITPRO/libnx/include" \
             -c /tmp/horizon-sync-probe.cpp \
             -o /tmp/horizon-sync-probe.o \
-            2>&1 | tee horizon-research/libnx-sync-probe-v2.8.log
+            2>&1 | tee horizon-research/libnx-sync-probe-v2.9.log
 
           STATUS=${PIPESTATUS[0]}
           echo "$STATUS" > horizon-research/libnx-sync-probe-exit-code.txt
@@ -1458,6 +1458,195 @@ jobs:
             echo FAILED > horizon-research/libnx-sync-probe-result.txt
           fi
           exit 0
+
+      # ============================================================
+      # v2.9: Horizon Park/Parker research + native header
+      # ============================================================
+
+      - name: Research HotSpot Park interfaces
+        shell: bash
+        run: |
+          set -e
+
+          OUT="horizon-research/park-research-v2.9.txt"
+
+          {
+            echo "========================================"
+            echo " Minecraft-NX"
+            echo " Horizon Park Research v2.9"
+            echo " Created by Farbert_Took"
+            echo "========================================"
+            echo ""
+            echo "===== share/runtime/park.hpp ====="
+            sed -n '1,260p' openjdk21/src/hotspot/share/runtime/park.hpp
+            echo ""
+            echo "===== PLATFORM PARK HEADERS ====="
+            find openjdk21/src/hotspot \
+              -type f -name 'park_*.hpp' -print | sort
+            echo ""
+            echo "===== PLATFORM PARK SOURCES ====="
+            find openjdk21/src/hotspot \
+              -type f \( -name 'park_*.cpp' -o -name 'park_*.c' \) \
+              -print | sort
+            echo ""
+            echo "===== PARK HEADER CONTENTS ====="
+            while IFS= read -r FILE; do
+              echo "----------------------------------------"
+              echo "$FILE"
+              echo "----------------------------------------"
+              sed -n '1,320p' "$FILE"
+            done < <(
+              find openjdk21/src/hotspot \
+                -type f -name 'park_*.hpp' -print | sort
+            )
+          } > "$OUT"
+
+          cat "$OUT"
+
+      - name: Create native park_horizon.hpp
+        shell: bash
+        run: |
+          set -e
+
+          mkdir -p openjdk21/src/hotspot/os/horizon
+
+          cat > openjdk21/src/hotspot/os/horizon/park_horizon.hpp <<'EOF'
+          /*
+           * Minecraft-NX
+           * OpenJDK Horizon experimental port
+           * Created by Farbert_Took
+           *
+           * Native Horizon/libnx backing storage for HotSpot ParkEvent
+           * and Parker. Method bodies remain in HotSpot's shared/OS
+           * sources; this header supplies the OS-specific fields.
+           *
+           * This intentionally does not alias Horizon to Linux and does
+           * not use pthread.
+           */
+
+          #ifndef OS_HORIZON_PARK_HORIZON_HPP
+          #define OS_HORIZON_PARK_HORIZON_HPP
+
+          #include <stdint.h>
+
+          // Avoid collision between libnx's Mutex typedef and HotSpot's
+          // own class Mutex.
+          #define Mutex NxMutex
+          #include <switch/kernel/mutex.h>
+          #include <switch/kernel/condvar.h>
+          #undef Mutex
+
+          class PlatformEvent : public CHeapObj<mtInternal> {
+           private:
+            PlatformEvent(const PlatformEvent&);
+            PlatformEvent& operator=(const PlatformEvent&);
+
+            volatile int _Event;
+            volatile int _nParked;
+            NxMutex _mutex;
+            CondVar _cond;
+            Thread* _Assoc;
+
+           public:
+            PlatformEvent() :
+                _Event(0),
+                _nParked(0),
+                _Assoc(nullptr) {
+              mutexInit(&_mutex);
+              condvarInit(&_cond);
+            }
+
+            ~PlatformEvent() {}
+
+            void reset() {
+              _Event = 0;
+            }
+
+            int fired() {
+              return _Event;
+            }
+
+            void park();
+            void unpark();
+            int TryPark();
+            int park(jlong millis);
+
+            void SetAssociation(Thread* a) {
+              _Assoc = a;
+            }
+
+           protected:
+            NxMutex* mutex() {
+              return &_mutex;
+            }
+
+            CondVar* cond() {
+              return &_cond;
+            }
+          };
+
+          class PlatformParker : public CHeapObj<mtInternal> {
+           protected:
+            enum {
+              REL_INDEX = 0,
+              ABS_INDEX = 1
+            };
+
+            int _cur_index;
+            NxMutex _mutex;
+            CondVar _cond[2];
+
+            NxMutex* mutex() {
+              return &_mutex;
+            }
+
+            CondVar* cond(int index) {
+              return &_cond[index];
+            }
+
+           public:
+            PlatformParker() :
+                _cur_index(-1) {
+              mutexInit(&_mutex);
+              condvarInit(&_cond[REL_INDEX]);
+              condvarInit(&_cond[ABS_INDEX]);
+            }
+
+            ~PlatformParker() {}
+          };
+
+          #endif // OS_HORIZON_PARK_HORIZON_HPP
+          EOF
+
+          cat > horizon-research/park-strategy-v2.9.txt <<'EOF'
+          Minecraft-NX / OpenJDK Horizon v2.9
+          Created by Farbert_Took
+
+          Decision: NATIVE HORIZON PARK STORAGE
+          pthread: NO
+          Linux alias: NO
+
+          PlatformEvent backing:
+          - libnx Mutex
+          - libnx CondVar
+          - HotSpot event/counter fields retained
+
+          PlatformParker backing:
+          - libnx Mutex
+          - two libnx CondVar objects for relative/absolute park channels
+
+          This v2.9 milestone intentionally focuses on satisfying the
+          HotSpot OS header contract and discovering the next compile
+          requirement. Passing compilation does not prove park/unpark
+          runtime semantics.
+          EOF
+
+          echo "===== park_horizon.hpp ====="
+          sed -n '1,320p' \
+            openjdk21/src/hotspot/os/horizon/park_horizon.hpp
+          echo ""
+          echo "===== STRATEGY ====="
+          cat horizon-research/park-strategy-v2.9.txt
 
       # ============================================================
       # Inject Horizon identity + include layers
@@ -1470,7 +1659,7 @@ jobs:
 
           cat >> "$OPENJDK_SPEC" <<'EOF'
 
-          # Minecraft-NX OpenJDK Horizon v2.8
+          # Minecraft-NX OpenJDK Horizon v2.9
 
           CFLAGS += -DMINECRAFT_NX_HORIZON=1
           CXXFLAGS += -DMINECRAFT_NX_HORIZON=1
@@ -1537,6 +1726,16 @@ jobs:
             openjdk21/src/hotspot/os/horizon/mutex_horizon.hpp
 
 
+          test -f \
+            openjdk21/src/hotspot/os/horizon/park_horizon.hpp
+
+          grep -q "class PlatformEvent" \
+            openjdk21/src/hotspot/os/horizon/park_horizon.hpp
+
+          grep -q "class PlatformParker" \
+            openjdk21/src/hotspot/os/horizon/park_horizon.hpp
+
+
           echo "===== HORIZON OS ====="
 
           find \
@@ -1560,7 +1759,7 @@ jobs:
       # Probe HotSpot
       # ============================================================
 
-      - name: Probe HotSpot v2.8
+      - name: Probe HotSpot v2.9
         shell: bash
         run: |
           set +e
@@ -1582,7 +1781,7 @@ jobs:
             LOG=trace \
             hotspot \
             2>&1 \
-            | tee ../horizon-research/hotspot-build-v2.8.log
+            | tee ../horizon-research/hotspot-build-v2.9.log
 
           STATUS=${PIPESTATUS[0]}
 
@@ -1595,7 +1794,7 @@ jobs:
       # Analyze next failure
       # ============================================================
 
-      - name: Analyze HotSpot v2.8
+      - name: Analyze HotSpot v2.9
         shell: bash
         run: |
           set +e
@@ -1605,7 +1804,7 @@ jobs:
           import re
 
           log_path = Path(
-              "horizon-research/hotspot-build-v2.8.log"
+              "horizon-research/hotspot-build-v2.9.log"
           )
 
           if not log_path.exists():
@@ -1683,6 +1882,13 @@ jobs:
               "No such file or directory" in text
           )
 
+
+          result(
+              "park-result.txt",
+              "fatal error: park_horizon.hpp: "
+              "No such file or directory" in text
+          )
+
           missing = []
 
           for m in re.findall(
@@ -1696,7 +1902,7 @@ jobs:
 
           Path(
               "horizon-research/"
-              "missing-horizon-headers-v2.8.txt"
+              "missing-horizon-headers-v2.9.txt"
           ).write_text(
               (
                   "\n".join(missing) + "\n"
@@ -1783,7 +1989,7 @@ jobs:
           out = [
               "========================================",
               " Minecraft-NX",
-              " HOTSPOT DIAGNOSTIC v2.8",
+              " HOTSPOT DIAGNOSTIC v2.9",
               " Created by Farbert_Took",
               "========================================",
               "",
@@ -1822,7 +2028,7 @@ jobs:
               ]
 
           Path(
-              "horizon-research/diagnostic-v2.8.txt"
+              "horizon-research/diagnostic-v2.9.txt"
           ).write_text(
               "\n".join(out) + "\n"
           )
@@ -1847,7 +2053,7 @@ jobs:
 
           Path(
               "horizon-research/"
-              "portability-errors-v2.8.txt"
+              "portability-errors-v2.9.txt"
           ).write_text(
               (
                   "\n".join(portability[:150]) + "\n"
@@ -1859,8 +2065,8 @@ jobs:
 
           tail \
             -n 300 \
-            horizon-research/hotspot-build-v2.8.log \
-            > horizon-research/hotspot-last-300-v2.8.txt \
+            horizon-research/hotspot-build-v2.9.log \
+            > horizon-research/hotspot-last-300-v2.9.txt \
             2>/dev/null \
             || true
 
@@ -1892,7 +2098,7 @@ jobs:
             || true
 
           git -C openjdk21 diff \
-            > horizon-research/openjdk-horizon-v2.8.patch
+            > horizon-research/openjdk-horizon-v2.9.patch
 
           exit 0
 
@@ -1960,6 +2166,12 @@ jobs:
             2>/dev/null || echo unknown
           )
 
+
+          PARK=$(
+            cat horizon-research/park-result.txt \
+            2>/dev/null || echo unknown
+          )
+
           SYNC_PROBE=$(
             cat horizon-research/libnx-sync-probe-result.txt \
             2>/dev/null || echo unknown
@@ -1967,7 +2179,7 @@ jobs:
 
           echo ""
           echo "========================================"
-          echo " Minecraft-NX v2.8 COMPACT RESULT"
+          echo " Minecraft-NX v2.9 COMPACT RESULT"
           echo " Created by Farbert_Took"
           echo "========================================"
           echo ""
@@ -1983,6 +2195,7 @@ jobs:
           echo "orderAccess_horizon_aarch64 blocker: $ORDERACCESS"
           echo "atomic_horizon_aarch64 blocker: $ATOMIC"
           echo "mutex_horizon blocker: $MUTEX"
+          echo "park_horizon blocker: $PARK"
           echo "libnx sync compile probe: $SYNC_PROBE"
 
           echo ""
@@ -1990,7 +2203,7 @@ jobs:
           echo ""
 
           cat \
-            horizon-research/os-cpu-strategy-v2.8.txt \
+            horizon-research/os-cpu-strategy-v2.9.txt \
             2>/dev/null \
             || true
 
@@ -1999,7 +2212,7 @@ jobs:
           echo ""
 
           cat \
-            horizon-research/orderaccess-strategy-v2.8.txt \
+            horizon-research/orderaccess-strategy-v2.9.txt \
             2>/dev/null \
             || true
 
@@ -2008,7 +2221,7 @@ jobs:
           echo ""
 
           cat \
-            horizon-research/atomic-strategy-v2.8.txt \
+            horizon-research/atomic-strategy-v2.9.txt \
             2>/dev/null \
             || true
 
@@ -2017,7 +2230,17 @@ jobs:
           echo ""
 
           cat \
-            horizon-research/mutex-strategy-v2.8.txt \
+            horizon-research/mutex-strategy-v2.9.txt \
+            2>/dev/null \
+            || true
+
+
+          echo ""
+          echo "===== PARK STRATEGY ====="
+          echo ""
+
+          cat \
+            horizon-research/park-strategy-v2.9.txt \
             2>/dev/null \
             || true
 
@@ -2026,7 +2249,7 @@ jobs:
           echo ""
 
           cat \
-            horizon-research/missing-horizon-headers-v2.8.txt \
+            horizon-research/missing-horizon-headers-v2.9.txt \
             2>/dev/null \
             || true
 
@@ -2035,7 +2258,7 @@ jobs:
           echo ""
 
           sed -n '1,150p' \
-            horizon-research/diagnostic-v2.8.txt \
+            horizon-research/diagnostic-v2.9.txt \
             2>/dev/null \
             || true
 
@@ -2044,19 +2267,19 @@ jobs:
           echo ""
 
           sed -n '1,100p' \
-            horizon-research/portability-errors-v2.8.txt \
+            horizon-research/portability-errors-v2.9.txt \
             2>/dev/null \
             || true
 
           echo ""
           echo "========================================"
-          echo " END Minecraft-NX v2.8"
+          echo " END Minecraft-NX v2.9"
           echo "========================================"
 
           exit 0
 
-      - name: Upload Horizon Research v2.8
+      - name: Upload Horizon Research v2.9
         uses: actions/upload-artifact@v4
         with:
-          name: Minecraft-NX-Farbert_Took-OpenJDK-Horizon-v2.8
+          name: Minecraft-NX-Farbert_Took-OpenJDK-Horizon-v2.9
           path: horizon-research
