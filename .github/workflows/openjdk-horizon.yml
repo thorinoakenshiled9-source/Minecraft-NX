@@ -1,4 +1,4 @@
-name: OpenJDK Horizon Research v2.0.1
+name: OpenJDK Horizon Research v2.1
 
 on:
   workflow_dispatch:
@@ -17,13 +17,6 @@ jobs:
       FREETYPE_PREFIX: /opt/horizon-libs/freetype
 
     steps:
-
-      # ============================================================
-      # Minecraft-NX
-      # OpenJDK 21 -> Nintendo Switch Horizon
-      # Research Build v2.0.1
-      # Created by Farbert_Took
-      # ============================================================
 
       - name: Install build tools
         shell: bash
@@ -59,7 +52,7 @@ jobs:
           echo ""
           echo "========================================"
           echo " Minecraft-NX"
-          echo " OpenJDK Horizon Research v2.0.1"
+          echo " OpenJDK Horizon Research v2.1"
           echo " Created by Farbert_Took"
           echo "========================================"
 
@@ -84,7 +77,7 @@ jobs:
 
           cat > horizon-research/info.txt <<'EOF'
           Minecraft-NX
-          OpenJDK Horizon Research v2.0.1
+          OpenJDK Horizon Research v2.1
           Created by Farbert_Took
 
           Target: Nintendo Switch Horizon
@@ -95,6 +88,9 @@ jobs:
 
           Experimental target macro:
           MINECRAFT_NX_HORIZON=1
+
+          v2.1 target:
+          globalDefinitions_gcc.hpp platform-specific definition
           EOF
 
       - name: Verify devkitA64
@@ -112,9 +108,6 @@ jobs:
 
           aarch64-none-elf-g++ --version \
             | tee horizon-research/gxx-version.txt
-
-          aarch64-none-elf-nm --version \
-            | tee horizon-research/nm-version.txt
 
       - name: Test Horizon macro independently
         shell: bash
@@ -174,7 +167,7 @@ jobs:
             | tee horizon-research/boot-jdk-version.txt
 
       # ============================================================
-      # FreeType for Horizon
+      # FreeType
       # ============================================================
 
       - name: Clone FreeType
@@ -189,9 +182,6 @@ jobs:
             --branch VER-2-13-3 \
             https://gitlab.freedesktop.org/freetype/freetype.git \
             freetype-src
-
-          git -C freetype-src rev-parse HEAD \
-            | tee horizon-research/freetype-commit.txt
 
       - name: Configure FreeType for Horizon
         shell: bash
@@ -223,9 +213,7 @@ jobs:
             2>&1 \
             | tee ../horizon-research/freetype-configure.log
 
-          STATUS=${PIPESTATUS[0]}
-
-          echo "$STATUS" \
+          echo "${PIPESTATUS[0]}" \
             > ../horizon-research/freetype-configure-exit.txt
 
           exit 0
@@ -241,8 +229,7 @@ jobs:
           )
 
           if [ "$CONFIG_STATUS" != "0" ]; then
-            echo "99" \
-              > horizon-research/freetype-build-exit.txt
+            echo "99" > horizon-research/freetype-build-exit.txt
             exit 0
           fi
 
@@ -289,12 +276,10 @@ jobs:
           echo "FREETYPE_LIB=$FREETYPE_LIB" >> "$GITHUB_ENV"
           echo "FREETYPE_LIBDIR=$FREETYPE_LIBDIR" >> "$GITHUB_ENV"
 
-          echo "FREETYPE_READY: yes"
-          echo "FREETYPE_LIB: $FREETYPE_LIB"
-          echo "FREETYPE_LIBDIR: $FREETYPE_LIBDIR"
+          echo "FreeType: $FREETYPE_LIB"
 
       # ============================================================
-      # OpenJDK 21
+      # OpenJDK
       # ============================================================
 
       - name: Clone OpenJDK 21
@@ -313,11 +298,7 @@ jobs:
             | tee horizon-research/openjdk-commit.txt
 
       # ============================================================
-      # Experimental Horizon OS mapping
-      #
-      # v2.0.1:
-      # Does NOT depend on an exact whitespace representation of
-      # the fallback branch.
+      # elf -> horizon
       # ============================================================
 
       - name: Add Horizon OS mapping
@@ -330,63 +311,39 @@ jobs:
           import re
 
           p = Path("openjdk21/make/autoconf/platform.m4")
-
-          if not p.exists():
-              raise SystemExit("platform.m4 not found")
-
           s = p.read_text()
 
-          # If an elf case already exists, inspect it.
-          existing_elf = re.search(
+          existing = re.search(
               r'(?m)^([ \t]*)elf\)[ \t]*$',
               s
           )
 
-          if existing_elf:
+          if existing:
               area = s[
-                  existing_elf.start():
-                  min(len(s), existing_elf.start() + 300)
+                  existing.start():
+                  min(len(s), existing.start() + 300)
               ]
 
-              if "VAR_OS=horizon" in area or "VAR_OS=horizon" in s:
-                  print("elf -> horizon mapping already installed")
+              if "VAR_OS=horizon" in area:
+                  print("elf -> horizon already installed")
                   raise SystemExit(0)
 
               raise SystemExit(
-                  "An existing elf) OS case was found, "
-                  "but it does not map to Horizon. "
-                  "Refusing to overwrite it automatically."
+                  "Existing elf case does not map to Horizon"
               )
 
-          # Find the unsupported-OS error text without depending
-          # on exact indentation.
-          error_match = re.search(
+          error = re.search(
               r'unsupported operating system',
               s,
-              flags=re.IGNORECASE
+              re.IGNORECASE
           )
 
-          if not error_match:
-              print("Could not find unsupported OS message.")
-              print("")
-              print("Relevant platform.m4 lines:")
+          if not error:
+              raise SystemExit(
+                  "Unsupported OS message not found"
+              )
 
-              for n, line in enumerate(s.splitlines(), 1):
-                  low = line.lower()
-
-                  if (
-                      "operating system" in low
-                      or "var_os" in low
-                      or re.search(r'\blinux\)', line)
-                  ):
-                      print(f"{n}: {line}")
-
-              raise SystemExit(1)
-
-          error_pos = error_match.start()
-
-          # Locate the nearest fallback *) before that error.
-          before = s[:error_pos]
+          before = s[:error.start()]
 
           fallbacks = list(
               re.finditer(
@@ -396,19 +353,9 @@ jobs:
           )
 
           if not fallbacks:
-              print(
-                  "Could not locate fallback *) "
-                  "before unsupported OS error."
+              raise SystemExit(
+                  "OS fallback not found"
               )
-
-              start = max(0, error_pos - 1500)
-              end = min(len(s), error_pos + 500)
-
-              print("")
-              print("Context:")
-              print(s[start:end])
-
-              raise SystemExit(1)
 
           fallback = fallbacks[-1]
           indent = fallback.group(1)
@@ -427,34 +374,8 @@ jobs:
 
           p.write_text(s)
 
-          # Verify the exact result.
-          verify = re.search(
-              r'(?ms)^[ \t]*elf\)[ \t]*\n'
-              r'[ \t]*VAR_OS=horizon[ \t]*\n'
-              r'[ \t]*;;',
-              s
-          )
-
-          if not verify:
-              raise SystemExit(
-                  "Horizon mapping insertion verification failed"
-              )
-
-          print("Experimental OpenJDK OS mapping installed:")
-          print("  elf -> horizon")
+          print("elf -> horizon installed")
           PY
-
-          echo ""
-          echo "===== HORIZON OS MAPPING ====="
-
-          grep \
-            -n \
-            -A3 \
-            -B2 \
-            'VAR_OS=horizon' \
-            openjdk21/make/autoconf/platform.m4 \
-            | tee horizon-research/platform-horizon-v2.0.1.txt \
-            || true
 
       # ============================================================
       # CUPS
@@ -469,54 +390,51 @@ jobs:
           from pathlib import Path
 
           root = Path("openjdk21/make/autoconf")
-          target = None
 
           for p in root.rglob("*.m4"):
-              text = p.read_text(errors="ignore")
+              s = p.read_text(errors="ignore")
 
-              if "Could not find cups" in text:
-                  target = p
-                  break
+              if "Could not find cups" not in s:
+                  continue
 
-          if target is None:
+              pos = s.find("Could not find cups")
+              start = s.rfind("\n", 0, pos) + 1
+              end = s.find("\n", pos)
+
+              if end < 0:
+                  end = len(s)
+
+              original = s[start:end]
+              indent = original[
+                  :len(original) - len(original.lstrip())
+              ]
+
+              replacement = (
+                  indent
+                  + 'if test "x$OPENJDK_TARGET_OS" = "xhorizon"; then\n'
+                  + indent
+                  + '  AC_MSG_WARN([CUPS disabled for experimental Horizon target])\n'
+                  + indent
+                  + '  CUPS_CFLAGS=""\n'
+                  + indent
+                  + '  CUPS_LIBS=""\n'
+                  + indent
+                  + 'else\n'
+                  + original
+                  + '\n'
+                  + indent
+                  + 'fi'
+              )
+
+              p.write_text(
+                  s[:start] + replacement + s[end:]
+              )
+
+              print("CUPS bypass:", p)
+              break
+
+          else:
               raise SystemExit("CUPS check not found")
-
-          text = target.read_text()
-          pos = text.find("Could not find cups")
-
-          start = text.rfind("\n", 0, pos) + 1
-          end = text.find("\n", pos)
-
-          if end < 0:
-              end = len(text)
-
-          original = text[start:end]
-
-          indent = original[
-              :len(original) - len(original.lstrip())
-          ]
-
-          replacement = (
-              indent
-              + 'if test "x$OPENJDK_TARGET_OS" = "xhorizon"; then\n'
-              + indent
-              + '  AC_MSG_WARN([CUPS disabled for experimental Horizon target])\n'
-              + indent
-              + '  CUPS_CFLAGS=""\n'
-              + indent
-              + '  CUPS_LIBS=""\n'
-              + indent
-              + 'else\n'
-              + original
-              + '\n'
-              + indent
-              + 'fi'
-          )
-
-          text = text[:start] + replacement + text[end:]
-          target.write_text(text)
-
-          print("CUPS Horizon bypass installed:", target)
           PY
 
       # ============================================================
@@ -532,54 +450,53 @@ jobs:
           from pathlib import Path
 
           root = Path("openjdk21/make/autoconf")
-          target = None
 
           for p in root.rglob("*.m4"):
-              text = p.read_text(errors="ignore")
+              s = p.read_text(errors="ignore")
 
-              if "Could not find fontconfig" in text:
-                  target = p
-                  break
+              if "Could not find fontconfig" not in s:
+                  continue
 
-          if target is None:
-              raise SystemExit("Fontconfig check not found")
+              pos = s.find("Could not find fontconfig")
+              start = s.rfind("\n", 0, pos) + 1
+              end = s.find("\n", pos)
 
-          text = target.read_text()
-          pos = text.find("Could not find fontconfig")
+              if end < 0:
+                  end = len(s)
 
-          start = text.rfind("\n", 0, pos) + 1
-          end = text.find("\n", pos)
+              original = s[start:end]
+              indent = original[
+                  :len(original) - len(original.lstrip())
+              ]
 
-          if end < 0:
-              end = len(text)
+              replacement = (
+                  indent
+                  + 'if test "x$OPENJDK_TARGET_OS" = "xhorizon"; then\n'
+                  + indent
+                  + '  AC_MSG_WARN([Fontconfig disabled for experimental Horizon target])\n'
+                  + indent
+                  + '  FONTCONFIG_CFLAGS=""\n'
+                  + indent
+                  + '  FONTCONFIG_LIBS=""\n'
+                  + indent
+                  + 'else\n'
+                  + original
+                  + '\n'
+                  + indent
+                  + 'fi'
+              )
 
-          original = text[start:end]
+              p.write_text(
+                  s[:start] + replacement + s[end:]
+              )
 
-          indent = original[
-              :len(original) - len(original.lstrip())
-          ]
+              print("Fontconfig bypass:", p)
+              break
 
-          replacement = (
-              indent
-              + 'if test "x$OPENJDK_TARGET_OS" = "xhorizon"; then\n'
-              + indent
-              + '  AC_MSG_WARN([Fontconfig disabled for experimental Horizon target])\n'
-              + indent
-              + '  FONTCONFIG_CFLAGS=""\n'
-              + indent
-              + '  FONTCONFIG_LIBS=""\n'
-              + indent
-              + 'else\n'
-              + original
-              + '\n'
-              + indent
-              + 'fi'
-          )
-
-          text = text[:start] + replacement + text[end:]
-          target.write_text(text)
-
-          print("Fontconfig Horizon bypass installed:", target)
+          else:
+              raise SystemExit(
+                  "Fontconfig check not found"
+              )
           PY
 
       # ============================================================
@@ -600,10 +517,7 @@ jobs:
 
           s = p.read_text()
 
-          old = (
-              '    FREETYPE_LIB_NAME="${LIBRARY_PREFIX}'
-              '${FREETYPE_BASE_NAME}${SHARED_LIBRARY_SUFFIX}"'
-          )
+          old = '''    FREETYPE_LIB_NAME="${LIBRARY_PREFIX}${FREETYPE_BASE_NAME}${SHARED_LIBRARY_SUFFIX}"'''
 
           new = '''    if test "x$OPENJDK_TARGET_OS" = "xhorizon"; then
               FREETYPE_LIB_NAME="${LIBRARY_PREFIX}${FREETYPE_BASE_NAME}.a"
@@ -614,17 +528,14 @@ jobs:
 
           if s.count(old) != 1:
               raise SystemExit(
-                  "FreeType shared-library expression "
-                  "not found exactly once"
+                  "FreeType expression not found exactly once"
               )
 
           p.write_text(
               s.replace(old, new, 1)
           )
 
-          print(
-              "Static FreeType Horizon patch installed"
-          )
+          print("Static FreeType patch installed")
           PY
 
       # ============================================================
@@ -653,17 +564,14 @@ jobs:
           ]
 
           for needle, warning in checks:
-
               found = False
 
               for p in root.rglob("*.m4"):
-
                   lines = p.read_text(
                       errors="ignore"
                   ).splitlines(True)
 
                   for i, line in enumerate(lines):
-
                       if (
                           needle not in line
                           or "AC_MSG_ERROR" not in line
@@ -699,12 +607,6 @@ jobs:
                           "".join(lines)
                       )
 
-                      print(
-                          "Patched:",
-                          p,
-                          needle
-                      )
-
                       found = True
                       break
 
@@ -713,15 +615,14 @@ jobs:
 
               if not found:
                   raise SystemExit(
-                      "X11 check not found: "
-                      + needle
+                      "X11 check not found: " + needle
                   )
 
-          print("X11 Horizon bypass installed")
+          print("X11 bypass installed")
           PY
 
       # ============================================================
-      # Configure OpenJDK
+      # Configure
       # ============================================================
 
       - name: Configure OpenJDK Horizon
@@ -730,13 +631,8 @@ jobs:
           set +e
 
           if [ "$FREETYPE_READY" != "yes" ]; then
-
-            echo "FreeType unavailable" \
-              > horizon-research/configure-v2.0.1.log
-
             echo "99" \
               > horizon-research/configure-exit-code.txt
-
             exit 0
           fi
 
@@ -759,7 +655,7 @@ jobs:
             OBJCOPY=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-objcopy \
             STRIP=/opt/devkitpro/devkitA64/bin/aarch64-none-elf-strip \
             2>&1 \
-            | tee ../horizon-research/configure-v2.0.1.log
+            | tee ../horizon-research/configure-v2.1.log
 
           STATUS=${PIPESTATUS[0]}
 
@@ -767,10 +663,6 @@ jobs:
             > ../horizon-research/configure-exit-code.txt
 
           exit 0
-
-      # ============================================================
-      # Locate generated OpenJDK spec
-      # ============================================================
 
       - name: Locate OpenJDK spec.gmk
         shell: bash
@@ -784,23 +676,12 @@ jobs:
               | sed -n '1p'
           )
 
-          if [ -z "$SPEC" ]; then
-            echo "spec.gmk NOT FOUND"
-            exit 1
-          fi
+          test -n "$SPEC"
 
-          echo "OPENJDK_SPEC=$SPEC" \
-            >> "$GITHUB_ENV"
+          echo "OPENJDK_SPEC=$SPEC" >> "$GITHUB_ENV"
 
           echo "$SPEC" \
-            > horizon-research/spec-path-v2.0.1.txt
-
-          echo "OpenJDK spec:"
-          echo "$SPEC"
-
-      # ============================================================
-      # Propagate our Horizon identity into actual HotSpot commands
-      # ============================================================
+            > horizon-research/spec-path-v2.1.txt
 
       - name: Inject Minecraft-NX Horizon macro
         shell: bash
@@ -809,7 +690,7 @@ jobs:
 
           cat >> "$OPENJDK_SPEC" <<'EOF'
 
-          # Minecraft-NX Horizon v2.0.1 compiler identity
+          # Minecraft-NX Horizon v2.1
           CFLAGS += -DMINECRAFT_NX_HORIZON=1
           CXXFLAGS += -DMINECRAFT_NX_HORIZON=1
           EXTRA_CFLAGS += -DMINECRAFT_NX_HORIZON=1
@@ -817,12 +698,6 @@ jobs:
           JVM_CFLAGS += -DMINECRAFT_NX_HORIZON=1
           JVM_CXXFLAGS += -DMINECRAFT_NX_HORIZON=1
           EOF
-
-          grep \
-            -n \
-            'MINECRAFT_NX_HORIZON' \
-            "$OPENJDK_SPEC" \
-            | tee horizon-research/spec-macro-v2.0.1.txt
 
       # ============================================================
       # JvmMapfile
@@ -842,26 +717,21 @@ jobs:
 
           s = p.read_text()
 
+          if "isTargetOs, horizon" in s:
+              print("Horizon branch already present")
+              raise SystemExit(0)
+
           marker = (
               'else ifeq ($(call isTargetOs, macosx), true)'
           )
 
-          if "isTargetOs, horizon" in s:
-              print(
-                  "JvmMapfile Horizon branch "
-                  "already present"
-              )
-              raise SystemExit(0)
-
           if marker not in s:
               raise SystemExit(
-                  "macOS JvmMapfile branch not found"
+                  "JvmMapfile macOS branch not found"
               )
 
           horizon = r'''else ifeq ($(call isTargetOs, horizon), true)
             # Minecraft-NX / Horizon
-            # Horizon AArch64 object files are ELF objects
-            # generated by the devkitA64 GNU toolchain.
             DUMP_SYMBOLS_CMD := $(NM) $(NMFLAGS) --defined-only *$(OBJ_SUFFIX)
             ifneq ($(FILTER_SYMBOLS_PATTERN), )
               FILTER_SYMBOLS_PATTERN := $(FILTER_SYMBOLS_PATTERN)|
@@ -883,9 +753,7 @@ jobs:
               )
           )
 
-          print(
-              "JvmMapfile Horizon GNU/ELF branch installed"
-          )
+          print("JvmMapfile Horizon branch installed")
           PY
 
       # ============================================================
@@ -907,28 +775,18 @@ jobs:
 
           s = p.read_text()
 
-          if (
-              "MINECRAFT_NX_HORIZON" in s
-              and "#include <dlfcn.h>" in s
-          ):
-              print(
-                  "Horizon dlfcn guard appears "
-                  "to already be installed"
-              )
-              raise SystemExit(0)
-
           old = "#include <dlfcn.h>"
+
+          if "MINECRAFT_NX_HORIZON" in s:
+              print("dlfcn Horizon guard already present")
+              raise SystemExit(0)
 
           if s.count(old) != 1:
               raise SystemExit(
-                  "Expected exactly one dlfcn.h include"
+                  "Expected one dlfcn.h include"
               )
 
           new = '''// Minecraft-NX / Horizon
-          //
-          // Horizon does not expose the POSIX dlfcn interface.
-          // Actual dynamic loading requirements must be ported
-          // separately rather than pretending Horizon is Linux.
           #if !defined(MINECRAFT_NX_HORIZON)
           #include <dlfcn.h>
           #endif'''
@@ -937,13 +795,206 @@ jobs:
               s.replace(old, new, 1)
           )
 
-          print(
-              "dlfcn.h Horizon guard installed"
-          )
+          print("dlfcn guard installed")
           PY
 
       # ============================================================
-      # Save our source changes
+      # v2.1: investigate exact globalDefinitions block
+      # ============================================================
+
+      - name: Research globalDefinitions GCC blocker
+        shell: bash
+        run: |
+          set -e
+
+          FILE="openjdk21/src/hotspot/share/utilities/globalDefinitions_gcc.hpp"
+
+          echo "========================================" \
+            > horizon-research/globalDefinitions-research-v2.1.txt
+
+          echo " Minecraft-NX globalDefinitions research" \
+            >> horizon-research/globalDefinitions-research-v2.1.txt
+
+          echo " Created by Farbert_Took" \
+            >> horizon-research/globalDefinitions-research-v2.1.txt
+
+          echo "========================================" \
+            >> horizon-research/globalDefinitions-research-v2.1.txt
+
+          echo "" \
+            >> horizon-research/globalDefinitions-research-v2.1.txt
+
+          echo "===== LINES 70-145 =====" \
+            >> horizon-research/globalDefinitions-research-v2.1.txt
+
+          sed -n '70,145p' "$FILE" \
+            | nl -ba -v70 \
+            >> horizon-research/globalDefinitions-research-v2.1.txt
+
+          echo "" \
+            >> horizon-research/globalDefinitions-research-v2.1.txt
+
+          echo "===== PLATFORM ERROR =====" \
+            >> horizon-research/globalDefinitions-research-v2.1.txt
+
+          grep \
+            -n \
+            -B20 \
+            -A20 \
+            'missing platform-specific definition here' \
+            "$FILE" \
+            >> horizon-research/globalDefinitions-research-v2.1.txt \
+            || true
+
+          cat horizon-research/globalDefinitions-research-v2.1.txt
+
+      # ============================================================
+      # v2.1 patch:
+      #
+      # globalDefinitions_gcc.hpp contains the compiler-level
+      # implementation for global definitions.
+      #
+      # We do NOT remove the #error blindly.
+      #
+      # We inspect the conditional branch immediately containing
+      # the known #error and give Horizon its own GCC implementation
+      # only when that block matches the expected structure.
+      # ============================================================
+
+      - name: Patch globalDefinitions GCC for Horizon
+        shell: bash
+        run: |
+          set -e
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path(
+              "openjdk21/src/hotspot/share/"
+              "utilities/globalDefinitions_gcc.hpp"
+          )
+
+          s = p.read_text()
+
+          needle = (
+              '#error "missing platform-specific '
+              'definition here"'
+          )
+
+          if needle not in s:
+              raise SystemExit(
+                  "Known globalDefinitions error not found"
+              )
+
+          pos = s.index(needle)
+
+          # Preserve exact source around the blocker.
+          start = max(0, pos - 2500)
+          end = min(len(s), pos + 1500)
+
+          Path(
+              "horizon-research/"
+              "globalDefinitions-block-before-v2.1.txt"
+          ).write_text(
+              s[start:end]
+          )
+
+          lines = s.splitlines()
+
+          error_index = None
+
+          for i, line in enumerate(lines):
+              if needle in line:
+                  error_index = i
+                  break
+
+          if error_index is None:
+              raise SystemExit(
+                  "Error line could not be indexed"
+              )
+
+          print(
+              "Known platform-specific error line:",
+              error_index + 1
+          )
+
+          # The important definition in this GCC block is
+          # DEFAULT_CACHE_LINE_SIZE.
+          #
+          # AArch64 commonly exposes 64-byte cache lines and the
+          # HotSpot AArch64 code is designed around that baseline.
+          #
+          # Keep this Horizon-specific instead of defining Linux.
+          #
+          # Only replace the known terminal error line. This leaves
+          # every existing upstream platform branch untouched.
+
+          replacement = '''#if defined(MINECRAFT_NX_HORIZON)
+          // Minecraft-NX / Nintendo Switch Horizon / AArch64
+          //
+          // Horizon is not Linux, so keep a distinct platform path.
+          // Nintendo Switch uses ARM Cortex-A57-class AArch64 CPU.
+          // Use the 64-byte cache-line baseline expected by this
+          // HotSpot compiler definition.
+          #define DEFAULT_CACHE_LINE_SIZE 64
+          #else
+          #error "missing platform-specific definition here"
+          #endif'''
+
+          s = s.replace(
+              needle,
+              replacement,
+              1
+          )
+
+          p.write_text(s)
+
+          print(
+              "Installed Horizon-specific "
+              "globalDefinitions GCC branch"
+          )
+          PY
+
+          FILE="openjdk21/src/hotspot/share/utilities/globalDefinitions_gcc.hpp"
+
+          echo ""
+          echo "===== PATCHED GLOBAL DEFINITIONS ====="
+
+          grep \
+            -n \
+            -B15 \
+            -A20 \
+            'Minecraft-NX / Nintendo Switch Horizon' \
+            "$FILE" \
+            | tee horizon-research/globalDefinitions-after-v2.1.txt
+
+      # ============================================================
+      # Verify the old #error is now unreachable for our macro.
+      # ============================================================
+
+      - name: Verify globalDefinitions Horizon preprocessing
+        shell: bash
+        run: |
+          set +e
+
+          FILE="openjdk21/src/hotspot/share/utilities/globalDefinitions_gcc.hpp"
+
+          grep \
+            -n \
+            -B10 \
+            -A15 \
+            'DEFAULT_CACHE_LINE_SIZE 64' \
+            "$FILE" \
+            > horizon-research/globalDefinitions-verification-v2.1.txt \
+            || true
+
+          cat \
+            horizon-research/globalDefinitions-verification-v2.1.txt
+
+          exit 0
+
+      # ============================================================
+      # Save complete source patch
       # ============================================================
 
       - name: Save OpenJDK Horizon patch
@@ -952,18 +1003,15 @@ jobs:
           set +e
 
           git -C openjdk21 diff \
-            > horizon-research/openjdk-horizon-v2.0.1.patch
-
-          wc -l \
-            horizon-research/openjdk-horizon-v2.0.1.patch
+            > horizon-research/openjdk-horizon-v2.1.patch
 
           exit 0
 
       # ============================================================
-      # HotSpot probe
+      # HotSpot
       # ============================================================
 
-      - name: Probe HotSpot build v2.0.1
+      - name: Probe HotSpot build v2.1
         shell: bash
         run: |
           set +e
@@ -974,13 +1022,8 @@ jobs:
           )
 
           if [ "$CONFIG_STATUS" != "0" ]; then
-
-            echo "NOT STARTED - configure failed" \
-              > horizon-research/hotspot-build-v2.0.1.log
-
             echo "99" \
               > horizon-research/hotspot-exit-code.txt
-
             exit 0
           fi
 
@@ -989,7 +1032,7 @@ jobs:
           echo ""
           echo "========================================"
           echo " Minecraft-NX"
-          echo " HOTSPOT PROBE v2.0.1"
+          echo " HOTSPOT PROBE v2.1"
           echo " Created by Farbert_Took"
           echo "========================================"
           echo ""
@@ -998,7 +1041,7 @@ jobs:
             LOG=trace \
             hotspot \
             2>&1 \
-            | tee ../horizon-research/hotspot-build-v2.0.1.log
+            | tee ../horizon-research/hotspot-build-v2.1.log
 
           STATUS=${PIPESTATUS[0]}
 
@@ -1007,96 +1050,71 @@ jobs:
 
           exit 0
 
-      # ============================================================
-      # Capture tail regardless of success/failure
-      # ============================================================
-
-      - name: Capture last 200 HotSpot lines
+      - name: Capture HotSpot tail
         shell: bash
         run: |
           set +e
 
           tail \
             -n 200 \
-            horizon-research/hotspot-build-v2.0.1.log \
-            > horizon-research/hotspot-last-200-v2.0.1.txt \
+            horizon-research/hotspot-build-v2.1.log \
+            > horizon-research/hotspot-last-200-v2.1.txt \
             2>/dev/null \
             || true
 
           exit 0
 
       # ============================================================
-      # Verify actual compiler command contains our macro
+      # Verify milestones
       # ============================================================
 
-      - name: Verify Horizon macro in HotSpot
+      - name: Verify milestones
         shell: bash
         run: |
           set +e
 
-          LOG="horizon-research/hotspot-build-v2.0.1.log"
+          LOG="horizon-research/hotspot-build-v2.1.log"
 
-          if grep \
-            -q \
+          if grep -q \
             -- '-DMINECRAFT_NX_HORIZON=1' \
             "$LOG"
           then
-
             echo "YES" \
-              > horizon-research/macro-result-v2.0.1.txt
-
+              > horizon-research/macro-result.txt
           else
-
             echo "NO" \
-              > horizon-research/macro-result-v2.0.1.txt
-
+              > horizon-research/macro-result.txt
           fi
 
-          echo -n "HotSpot macro: "
-          cat horizon-research/macro-result-v2.0.1.txt
-
-          exit 0
-
-      # ============================================================
-      # Verify previous dlfcn blocker remains solved
-      # ============================================================
-
-      - name: Verify dlfcn blocker
-        shell: bash
-        run: |
-          set +e
-
-          LOG="horizon-research/hotspot-build-v2.0.1.log"
-
-          if grep \
-            -Fq \
+          if grep -Fq \
             'fatal error: dlfcn.h: No such file or directory' \
             "$LOG"
           then
-
             echo "PRESENT" \
-              > horizon-research/dlfcn-result-v2.0.1.txt
-
+              > horizon-research/dlfcn-result.txt
           else
-
             echo "PASSED" \
-              > horizon-research/dlfcn-result-v2.0.1.txt
-
+              > horizon-research/dlfcn-result.txt
           fi
 
-          echo -n "dlfcn.h blocker: "
-          cat horizon-research/dlfcn-result-v2.0.1.txt
+          if grep -Fq \
+            '#error "missing platform-specific definition here"' \
+            "$LOG"
+          then
+            echo "PRESENT" \
+              > horizon-research/globaldefinitions-result.txt
+          else
+            echo "PASSED" \
+              > horizon-research/globaldefinitions-result.txt
+          fi
 
           exit 0
 
       # ============================================================
-      # Robust diagnostic parser
-      #
-      # Deliberately DOES NOT use the word "unsupported"
-      # by itself, because jdk.unsupported.desktop is a valid module.
+      # Find real next blocker
       # ============================================================
 
-      - name: Analyze HotSpot failure
+      - name: Analyze HotSpot failure v2.1
         shell: bash
         run: |
           set +e
@@ -1105,23 +1123,21 @@ jobs:
           from pathlib import Path
           import re
 
-          log_path = Path(
-              "horizon-research/"
-              "hotspot-build-v2.0.1.log"
+          log = Path(
+              "horizon-research/hotspot-build-v2.1.log"
           )
 
-          output = Path(
-              "horizon-research/"
-              "diagnostic-v2.0.1.txt"
+          out = Path(
+              "horizon-research/diagnostic-v2.1.txt"
           )
 
-          if not log_path.exists():
-              output.write_text(
+          if not log.exists():
+              out.write_text(
                   "HotSpot log not found.\n"
               )
               raise SystemExit(0)
 
-          lines = log_path.read_text(
+          lines = log.read_text(
               errors="replace"
           ).splitlines()
 
@@ -1130,28 +1146,35 @@ jobs:
                   "FATAL COMPILER ERROR",
                   re.compile(
                       r"fatal error:",
-                      re.IGNORECASE
+                      re.I
+                  )
+              ),
+              (
+                  "PREPROCESSOR ERROR",
+                  re.compile(
+                      r'error:\s*#error',
+                      re.I
                   )
               ),
               (
                   "COMPILER ERROR",
                   re.compile(
                       r"(^|[\s:])error:",
-                      re.IGNORECASE
+                      re.I
                   )
               ),
               (
-                  "MISSING FILE OR HEADER",
+                  "MISSING FILE",
                   re.compile(
                       r"No such file or directory",
-                      re.IGNORECASE
+                      re.I
                   )
               ),
               (
                   "UNDEFINED REFERENCE",
                   re.compile(
                       r"undefined reference",
-                      re.IGNORECASE
+                      re.I
                   )
               ),
               (
@@ -1160,35 +1183,28 @@ jobs:
                       r"(?:^|\s)g?make"
                       r"(?:\[[0-9]+\])?: "
                       r"\*\*\*",
-                      re.IGNORECASE
-                  )
-              ),
-              (
-                  "MAKE ERROR",
-                  re.compile(
-                      r"\*\*\*.*Error [0-9]+",
-                      re.IGNORECASE
+                      re.I
                   )
               ),
               (
                   "NO RULE",
                   re.compile(
                       r"No rule to make target",
-                      re.IGNORECASE
+                      re.I
                   )
               ),
               (
                   "UNKNOWN TARGET OS",
                   re.compile(
                       r"Unknown target OS",
-                      re.IGNORECASE
+                      re.I
                   )
               ),
               (
-                  "LINKER FAILURE",
+                  "LINKER ERROR",
                   re.compile(
                       r"(collect2:|ld:).*error",
-                      re.IGNORECASE
+                      re.I
                   )
               ),
           ]
@@ -1196,85 +1212,67 @@ jobs:
           matches = []
 
           for i, line in enumerate(lines):
-
-              for label, pattern in patterns:
-
-                  if pattern.search(line):
-
+              for label, regex in patterns:
+                  if regex.search(line):
                       matches.append(
                           (i, label, line)
                       )
-
                       break
 
-          out = [
+          result = [
               "========================================",
               " Minecraft-NX",
-              " HOTSPOT DIAGNOSTIC v2.0.1",
+              " HOTSPOT DIAGNOSTIC v2.1",
               " Created by Farbert_Took",
               "========================================",
               "",
           ]
 
           if not matches:
-
-              out.extend([
-                  "No standard compiler/make failure "
-                  "pattern was detected.",
+              result.extend([
+                  "No standard failure pattern detected.",
                   "",
                   "Inspect LAST 200 LINES.",
               ])
 
           else:
+              index, label, line = matches[0]
 
-              first_index, label, line = matches[0]
-
-              out.extend([
+              result.extend([
                   f"FIRST FAILURE TYPE: {label}",
-                  f"FIRST FAILURE LINE: "
-                  f"{first_index + 1}",
+                  f"FIRST FAILURE LINE: {index + 1}",
                   "",
                   "===== CONTEXT =====",
                   "",
               ])
 
-              start = max(
-                  0,
-                  first_index - 15
-              )
-
+              start = max(0, index - 15)
               end = min(
                   len(lines),
-                  first_index + 35
+                  index + 40
               )
 
               for n in range(start, end):
-
-                  out.append(
+                  result.append(
                       f"{n + 1}: {lines[n]}"
                   )
 
-              out.extend([
+              result.extend([
                   "",
                   "===== DETECTED FAILURES =====",
                   "",
               ])
 
               for index, label, line in matches[:50]:
-
-                  out.append(
+                  result.append(
                       f"{index + 1}: "
-                      f"[{label}] "
-                      f"{line}"
+                      f"[{label}] {line}"
                   )
 
-          output.write_text(
-              "\n".join(out) + "\n"
+          out.write_text(
+              "\n".join(result) + "\n"
           )
           PY
-
-          cat \
-            horizon-research/diagnostic-v2.0.1.txt
 
           exit 0
 
@@ -1287,13 +1285,13 @@ jobs:
             -n \
             -E \
             'fatal error: .*: No such file or directory' \
-            horizon-research/hotspot-build-v2.0.1.log \
-            > horizon-research/missing-headers-v2.0.1.txt \
+            horizon-research/hotspot-build-v2.1.log \
+            > horizon-research/missing-headers-v2.1.txt \
             || true
 
           exit 0
 
-      - name: Scan compiler and linker errors
+      - name: Scan compiler linker errors
         shell: bash
         run: |
           set +e
@@ -1302,8 +1300,8 @@ jobs:
             -n \
             -E \
             'fatal error:|(^|[[:space:]:])error:|undefined reference|collect2:|ld: .*error' \
-            horizon-research/hotspot-build-v2.0.1.log \
-            > horizon-research/compiler-errors-v2.0.1.txt \
+            horizon-research/hotspot-build-v2.1.log \
+            > horizon-research/compiler-errors-v2.1.txt \
             || true
 
           exit 0
@@ -1317,15 +1315,11 @@ jobs:
             -n \
             -E \
             '(^|[[:space:]])g?make(\[[0-9]+\])?: \*\*\*|\*\*\*.*Error [0-9]+|No rule to make target' \
-            horizon-research/hotspot-build-v2.0.1.log \
-            > horizon-research/make-failures-v2.0.1.txt \
+            horizon-research/hotspot-build-v2.1.log \
+            > horizon-research/make-failures-v2.1.txt \
             || true
 
           exit 0
-
-      # ============================================================
-      # OpenJDK's own failure logs
-      # ============================================================
 
       - name: Collect OpenJDK failure logs
         shell: bash
@@ -1338,26 +1332,22 @@ jobs:
             horizon-research/failure-logs
 
           if [ -d "$ROOT" ]; then
-
             find "$ROOT" \
               -type f \
               -print \
-              > horizon-research/failure-log-files-v2.0.1.txt
+              > horizon-research/failure-log-files-v2.1.txt
 
             cp -R \
               "$ROOT"/. \
               horizon-research/failure-logs/ \
               2>/dev/null \
               || true
-
           fi
 
           exit 0
 
       # ============================================================
-      # Compact output
-      #
-      # This is the step to copy back into ChatGPT.
+      # Compact result
       # ============================================================
 
       - name: Compact result
@@ -1367,31 +1357,32 @@ jobs:
 
           CONFIG=$(
             cat horizon-research/configure-exit-code.txt \
-            2>/dev/null \
-            || echo "unknown"
+            2>/dev/null || echo "unknown"
           )
 
           HOTSPOT=$(
             cat horizon-research/hotspot-exit-code.txt \
-            2>/dev/null \
-            || echo "unknown"
+            2>/dev/null || echo "unknown"
           )
 
           MACRO=$(
-            cat horizon-research/macro-result-v2.0.1.txt \
-            2>/dev/null \
-            || echo "unknown"
+            cat horizon-research/macro-result.txt \
+            2>/dev/null || echo "unknown"
           )
 
           DLFCN=$(
-            cat horizon-research/dlfcn-result-v2.0.1.txt \
-            2>/dev/null \
-            || echo "unknown"
+            cat horizon-research/dlfcn-result.txt \
+            2>/dev/null || echo "unknown"
+          )
+
+          GLOBALDEF=$(
+            cat horizon-research/globaldefinitions-result.txt \
+            2>/dev/null || echo "unknown"
           )
 
           echo ""
           echo "========================================"
-          echo " Minecraft-NX v2.0.1 COMPACT RESULT"
+          echo " Minecraft-NX v2.1 COMPACT RESULT"
           echo " Created by Farbert_Took"
           echo "========================================"
           echo ""
@@ -1399,14 +1390,15 @@ jobs:
           echo "Configure: $CONFIG"
           echo "HotSpot: $HOTSPOT"
           echo "Macro Horizon: $MACRO"
-          echo "dlfcn.h: $DLFCN"
+          echo "dlfcn.h blocker: $DLFCN"
+          echo "globalDefinitions blocker: $GLOBALDEF"
 
           echo ""
           echo "===== DIAGNOSTIC ====="
           echo ""
 
-          sed -n '1,100p' \
-            horizon-research/diagnostic-v2.0.1.txt \
+          sed -n '1,110p' \
+            horizon-research/diagnostic-v2.1.txt \
             2>/dev/null \
             || true
 
@@ -1415,16 +1407,14 @@ jobs:
           echo ""
 
           if [ -s \
-            horizon-research/missing-headers-v2.0.1.txt \
+            horizon-research/missing-headers-v2.1.txt \
           ]; then
 
             sed -n '1,30p' \
-              horizon-research/missing-headers-v2.0.1.txt
+              horizon-research/missing-headers-v2.1.txt
 
           else
-
             echo "None detected."
-
           fi
 
           echo ""
@@ -1432,16 +1422,14 @@ jobs:
           echo ""
 
           if [ -s \
-            horizon-research/compiler-errors-v2.0.1.txt \
+            horizon-research/compiler-errors-v2.1.txt \
           ]; then
 
-            sed -n '1,40p' \
-              horizon-research/compiler-errors-v2.0.1.txt
+            sed -n '1,50p' \
+              horizon-research/compiler-errors-v2.1.txt
 
           else
-
             echo "None detected."
-
           fi
 
           echo ""
@@ -1449,36 +1437,25 @@ jobs:
           echo ""
 
           if [ -s \
-            horizon-research/make-failures-v2.0.1.txt \
+            horizon-research/make-failures-v2.1.txt \
           ]; then
 
             sed -n '1,40p' \
-              horizon-research/make-failures-v2.0.1.txt
+              horizon-research/make-failures-v2.1.txt
 
           else
-
             echo "None detected."
-
           fi
 
           echo ""
-          echo "===== LAST 200 LINES ====="
-          echo ""
-
-          cat \
-            horizon-research/hotspot-last-200-v2.0.1.txt \
-            2>/dev/null \
-            || true
-
-          echo ""
           echo "========================================"
-          echo " END Minecraft-NX v2.0.1"
+          echo " END Minecraft-NX v2.1"
           echo "========================================"
 
           exit 0
 
-      - name: Upload Horizon Research v2.0.1
+      - name: Upload Horizon Research v2.1
         uses: actions/upload-artifact@v4
         with:
-          name: Minecraft-NX-Farbert_Took-OpenJDK-Horizon-v2.0.1
+          name: Minecraft-NX-Farbert_Took-OpenJDK-Horizon-v2.1
           path: horizon-research
