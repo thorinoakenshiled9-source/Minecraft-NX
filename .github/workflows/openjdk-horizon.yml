@@ -1,4 +1,4 @@
-name: OpenJDK Horizon Research v2.5
+name: OpenJDK Horizon Research v2.6
 
 on:
   workflow_dispatch:
@@ -32,7 +32,7 @@ jobs:
 
           echo "========================================"
           echo " Minecraft-NX"
-          echo " OpenJDK Horizon Research v2.5"
+          echo " OpenJDK Horizon Research v2.6"
           echo " Created by Farbert_Took"
           echo "========================================"
 
@@ -40,6 +40,7 @@ jobs:
         shell: bash
         run: |
           set -e
+
           echo "/opt/devkitpro/devkitA64/bin" >> "$GITHUB_PATH"
           echo "/opt/devkitpro/tools/bin" >> "$GITHUB_PATH"
 
@@ -56,7 +57,7 @@ jobs:
 
           cat > horizon-research/info.txt <<'EOF'
           Minecraft-NX
-          OpenJDK Horizon Research v2.5
+          OpenJDK Horizon Research v2.6
           Created by Farbert_Took
 
           Target: Nintendo Switch Horizon
@@ -74,9 +75,10 @@ jobs:
           - c1_globals_horizon.hpp
           - globals_horizon.hpp
           - globals_horizon_aarch64.hpp
-
-          v2.5 target:
           - orderAccess_horizon_aarch64.hpp
+
+          v2.6 target:
+          - atomic_horizon_aarch64.hpp
           - inspect next Horizon portability blocker
           EOF
 
@@ -434,7 +436,7 @@ jobs:
             OBJCOPY="$DEVKITA64/bin/aarch64-none-elf-objcopy" \
             STRIP="$DEVKITA64/bin/aarch64-none-elf-strip" \
             2>&1 \
-            | tee ../horizon-research/configure-v2.5.log
+            | tee ../horizon-research/configure-v2.6.log
 
           STATUS=${PIPESTATUS[0]}
 
@@ -512,7 +514,7 @@ jobs:
           PY
 
       # ============================================================
-      # Previous globalDefinitions fixes
+      # globalDefinitions
       # ============================================================
 
       - name: Patch globalDefinitions
@@ -559,7 +561,7 @@ jobs:
           PY
 
       # ============================================================
-      # Horizon OS directory
+      # Horizon OS headers
       # ============================================================
 
       - name: Create Horizon OS headers
@@ -598,11 +600,13 @@ jobs:
               data = src.read_text()
 
               data = data.replace(
-                  "LINUX", "HORIZON"
+                  "LINUX",
+                  "HORIZON"
               )
 
               data = data.replace(
-                  "Linux", "Horizon"
+                  "Linux",
+                  "Horizon"
               )
 
               target = dst / target_name
@@ -640,7 +644,7 @@ jobs:
           PY
 
       # ============================================================
-      # OS+CPU globals research
+      # Horizon + AArch64 globals
       # ============================================================
 
       - name: Research OS CPU AArch64 globals
@@ -648,11 +652,11 @@ jobs:
         run: |
           set -e
 
-          OUT="horizon-research/os-cpu-aarch64-research-v2.5.txt"
+          OUT="horizon-research/os-cpu-aarch64-research-v2.6.txt"
 
           echo "========================================" > "$OUT"
           echo " Minecraft-NX" >> "$OUT"
-          echo " OS+CPU AArch64 Research v2.5" >> "$OUT"
+          echo " OS+CPU AArch64 Research v2.6" >> "$OUT"
           echo " Created by Farbert_Took" >> "$OUT"
           echo "========================================" >> "$OUT"
           echo "" >> "$OUT"
@@ -670,10 +674,6 @@ jobs:
             || true
 
           cat "$OUT"
-
-      # ============================================================
-      # Create OS+CPU Horizon/AArch64 globals
-      # ============================================================
 
       - name: Create globals_horizon_aarch64.hpp
         shell: bash
@@ -749,35 +749,28 @@ jobs:
 
           data = source.read_text()
 
-          data = data.replace(
-              "globals_linux_aarch64.hpp",
-              "globals_horizon_aarch64.hpp"
-          )
+          replacements = {
+              "globals_linux_aarch64.hpp":
+                  "globals_horizon_aarch64.hpp",
 
-          data = data.replace(
-              "globals_bsd_aarch64.hpp",
-              "globals_horizon_aarch64.hpp"
-          )
+              "globals_bsd_aarch64.hpp":
+                  "globals_horizon_aarch64.hpp",
 
-          data = data.replace(
-              "GLOBALS_LINUX_AARCH64_HPP",
-              "GLOBALS_HORIZON_AARCH64_HPP"
-          )
+              "GLOBALS_LINUX_AARCH64_HPP":
+                  "GLOBALS_HORIZON_AARCH64_HPP",
 
-          data = data.replace(
-              "GLOBALS_BSD_AARCH64_HPP",
-              "GLOBALS_HORIZON_AARCH64_HPP"
-          )
+              "GLOBALS_BSD_AARCH64_HPP":
+                  "GLOBALS_HORIZON_AARCH64_HPP",
 
-          data = data.replace(
-              "OS_CPU_LINUX_AARCH64_GLOBALS_LINUX_AARCH64_HPP",
-              "OS_CPU_HORIZON_AARCH64_GLOBALS_HORIZON_AARCH64_HPP"
-          )
+              "OS_CPU_LINUX_AARCH64_GLOBALS_LINUX_AARCH64_HPP":
+                  "OS_CPU_HORIZON_AARCH64_GLOBALS_HORIZON_AARCH64_HPP",
 
-          data = data.replace(
-              "OS_CPU_BSD_AARCH64_GLOBALS_BSD_AARCH64_HPP",
-              "OS_CPU_HORIZON_AARCH64_GLOBALS_HORIZON_AARCH64_HPP"
-          )
+              "OS_CPU_BSD_AARCH64_GLOBALS_BSD_AARCH64_HPP":
+                  "OS_CPU_HORIZON_AARCH64_GLOBALS_HORIZON_AARCH64_HPP",
+          }
+
+          for old, new in replacements.items():
+              data = data.replace(old, new)
 
           banner = '''/*
            * Minecraft-NX
@@ -785,9 +778,7 @@ jobs:
            * Created by Farbert_Took
            *
            * Horizon + AArch64 HotSpot platform globals.
-           *
            * Horizon remains a distinct target.
-           * This file does not define __linux__.
            */
 
           '''
@@ -798,7 +789,7 @@ jobs:
 
           info = Path(
               "horizon-research/"
-              "os-cpu-strategy-v2.5.txt"
+              "os-cpu-strategy-v2.6.txt"
           )
 
           info.write_text(
@@ -810,15 +801,8 @@ jobs:
           print(info.read_text())
           PY
 
-          echo ""
-          echo "===== globals_horizon_aarch64.hpp ====="
-
-          sed -n '1,220p' \
-            openjdk21/src/hotspot/os_cpu/horizon_aarch64/globals_horizon_aarch64.hpp
-
       # ============================================================
-      # v2.5 research:
-      # AArch64 memory ordering / OrderAccess
+      # AArch64 OrderAccess
       # ============================================================
 
       - name: Research AArch64 OrderAccess
@@ -826,11 +810,11 @@ jobs:
         run: |
           set -e
 
-          OUT="horizon-research/orderaccess-research-v2.5.txt"
+          OUT="horizon-research/orderaccess-research-v2.6.txt"
 
           echo "========================================" > "$OUT"
           echo " Minecraft-NX" >> "$OUT"
-          echo " OrderAccess AArch64 Research v2.5" >> "$OUT"
+          echo " OrderAccess AArch64 Research v2.6" >> "$OUT"
           echo " Created by Farbert_Took" >> "$OUT"
           echo "========================================" >> "$OUT"
           echo "" >> "$OUT"
@@ -923,11 +907,6 @@ jobs:
                   "implementation found."
               )
 
-          print("OrderAccess candidates:")
-
-          for candidate in candidates:
-              print(" ", candidate)
-
           preferred = [
               root / "os_cpu" / "linux_aarch64" /
               "orderAccess_linux_aarch64.hpp",
@@ -948,7 +927,6 @@ jobs:
 
           data = source.read_text()
 
-          # Do not silently import Linux/POSIX runtime dependencies.
           forbidden_patterns = [
               r'#include\s*<sys/',
               r'#include\s*<linux/',
@@ -970,7 +948,7 @@ jobs:
 
           research = Path(
               "horizon-research/"
-              "orderaccess-strategy-v2.5.txt"
+              "orderaccess-strategy-v2.6.txt"
           )
 
           if problems:
@@ -985,8 +963,7 @@ jobs:
 
               raise SystemExit(
                   "Selected OrderAccess implementation "
-                  "contains OS-specific dependencies. "
-                  "See orderaccess-strategy-v2.5.txt"
+                  "contains OS-specific dependencies."
               )
 
           replacements = {
@@ -1018,10 +995,6 @@ jobs:
            * Created by Farbert_Took
            *
            * Horizon + AArch64 OrderAccess implementation.
-           *
-           * Source was checked for obvious Linux/POSIX runtime
-           * dependencies before being used as an AArch64 reference.
-           *
            * Horizon remains a distinct target.
            */
 
@@ -1039,16 +1012,242 @@ jobs:
           )
 
           print(research.read_text())
+          PY
+
+      # ============================================================
+      # v2.6 research:
+      # AArch64 Atomic
+      # ============================================================
+
+      - name: Research AArch64 Atomic
+        shell: bash
+        run: |
+          set -e
+
+          OUT="horizon-research/atomic-research-v2.6.txt"
+
+          echo "========================================" > "$OUT"
+          echo " Minecraft-NX" >> "$OUT"
+          echo " Atomic AArch64 Research v2.6" >> "$OUT"
+          echo " Created by Farbert_Took" >> "$OUT"
+          echo "========================================" >> "$OUT"
+          echo "" >> "$OUT"
+
+          echo "===== ALL ATOMIC PLATFORM HEADERS =====" >> "$OUT"
+          echo "" >> "$OUT"
+
+          find openjdk21/src/hotspot \
+            -type f \
+            -name 'atomic_*.hpp' \
+            -print \
+            | sort \
+            >> "$OUT"
+
+          echo "" >> "$OUT"
+          echo "===== AARCH64 ATOMIC HEADERS =====" >> "$OUT"
+          echo "" >> "$OUT"
+
+          find openjdk21/src/hotspot \
+            -type f \
+            -name 'atomic_*aarch64*.hpp' \
+            -print \
+            | sort \
+            >> "$OUT"
+
+          echo "" >> "$OUT"
+          echo "===== CONTENTS =====" >> "$OUT"
+
+          while IFS= read -r FILE
+          do
+            echo "" >> "$OUT"
+            echo "----------------------------------------" >> "$OUT"
+            echo "$FILE" >> "$OUT"
+            echo "----------------------------------------" >> "$OUT"
+
+            cat "$FILE" >> "$OUT"
+
+          done < <(
+            find openjdk21/src/hotspot \
+              -type f \
+              -name 'atomic_*aarch64*.hpp' \
+              -print \
+              | sort
+          )
+
+          cat "$OUT"
+
+      - name: Create atomic_horizon_aarch64.hpp
+        shell: bash
+        run: |
+          set -e
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path("openjdk21/src/hotspot")
+
+          dst = (
+              root /
+              "os_cpu" /
+              "horizon_aarch64"
+          )
+
+          dst.mkdir(
+              parents=True,
+              exist_ok=True
+          )
+
+          target = (
+              dst /
+              "atomic_horizon_aarch64.hpp"
+          )
+
+          candidates = list(
+              root.glob(
+                  "os_cpu/*_aarch64/"
+                  "atomic_*_aarch64.hpp"
+              )
+          )
+
+          candidates = [
+              p for p in candidates
+              if "horizon_aarch64" not in str(p)
+          ]
+
+          if not candidates:
+              raise SystemExit(
+                  "No upstream AArch64 Atomic "
+                  "implementation found."
+              )
+
+          print("Atomic candidates:")
+
+          for candidate in candidates:
+              print(" ", candidate)
+
+          preferred = [
+              root / "os_cpu" / "linux_aarch64" /
+              "atomic_linux_aarch64.hpp",
+
+              root / "os_cpu" / "bsd_aarch64" /
+              "atomic_bsd_aarch64.hpp",
+          ]
+
+          source = None
+
+          for candidate in preferred:
+              if candidate.exists():
+                  source = candidate
+                  break
+
+          if source is None:
+              source = candidates[0]
+
+          data = source.read_text()
+
+          forbidden_patterns = [
+              r'#include\s*<sys/',
+              r'#include\s*<linux/',
+              r'#include\s*<pthread\.h>',
+              r'#include\s*<unistd\.h>',
+              r'\bpthread_',
+              r'\bmmap\s*\(',
+              r'\bmunmap\s*\(',
+              r'\bsyscall\s*\(',
+              r'\bfutex\b',
+              r'\b__linux__\b',
+          ]
+
+          problems = []
+
+          for pattern in forbidden_patterns:
+              if re.search(pattern, data):
+                  problems.append(pattern)
+
+          research = Path(
+              "horizon-research/"
+              "atomic-strategy-v2.6.txt"
+          )
+
+          if problems:
+              research.write_text(
+                  "Source: " + str(source) + "\n"
+                  "Decision: REJECTED\n"
+                  "Reason: OS-specific dependencies detected\n"
+                  "Patterns:\n"
+                  + "\n".join(problems)
+                  + "\n"
+              )
+
+              raise SystemExit(
+                  "Selected Atomic implementation "
+                  "contains OS-specific dependencies. "
+                  "See atomic-strategy-v2.6.txt"
+              )
+
+          replacements = {
+              "atomic_linux_aarch64.hpp":
+                  "atomic_horizon_aarch64.hpp",
+
+              "atomic_bsd_aarch64.hpp":
+                  "atomic_horizon_aarch64.hpp",
+
+              "ATOMIC_LINUX_AARCH64_HPP":
+                  "ATOMIC_HORIZON_AARCH64_HPP",
+
+              "ATOMIC_BSD_AARCH64_HPP":
+                  "ATOMIC_HORIZON_AARCH64_HPP",
+
+              "OS_CPU_LINUX_AARCH64_ATOMIC_LINUX_AARCH64_HPP":
+                  "OS_CPU_HORIZON_AARCH64_ATOMIC_HORIZON_AARCH64_HPP",
+
+              "OS_CPU_BSD_AARCH64_ATOMIC_BSD_AARCH64_HPP":
+                  "OS_CPU_HORIZON_AARCH64_ATOMIC_HORIZON_AARCH64_HPP",
+          }
+
+          for old, new in replacements.items():
+              data = data.replace(old, new)
+
+          banner = '''/*
+           * Minecraft-NX
+           * OpenJDK Horizon experimental port
+           * Created by Farbert_Took
+           *
+           * Horizon + AArch64 Atomic implementation.
+           *
+           * Atomic operations are VM-critical.
+           * The reference implementation was accepted only after
+           * checking for obvious Linux/POSIX runtime dependencies.
+           *
+           * Horizon remains a distinct target.
+           */
+
+          '''
+
+          target.write_text(
+              banner + data
+          )
+
+          research.write_text(
+              "Source: " + str(source) + "\n"
+              "Decision: ACCEPTED AS AARCH64 REFERENCE\n"
+              "Target: " + str(target) + "\n"
+              "Linux/POSIX runtime dependency scan: CLEAN\n"
+          )
+
+          print("")
+          print(research.read_text())
 
           print(
-              "===== orderAccess_horizon_aarch64.hpp ====="
+              "===== atomic_horizon_aarch64.hpp ====="
           )
 
           print(target.read_text())
           PY
 
       # ============================================================
-      # Inject Horizon identity + both include layers
+      # Inject Horizon identity + include layers
       # ============================================================
 
       - name: Inject Horizon HotSpot flags
@@ -1058,7 +1257,8 @@ jobs:
 
           cat >> "$OPENJDK_SPEC" <<'EOF'
 
-          # Minecraft-NX OpenJDK Horizon v2.5
+          # Minecraft-NX OpenJDK Horizon v2.6
+
           CFLAGS += -DMINECRAFT_NX_HORIZON=1
           CXXFLAGS += -DMINECRAFT_NX_HORIZON=1
           EXTRA_CFLAGS += -DMINECRAFT_NX_HORIZON=1
@@ -1083,6 +1283,10 @@ jobs:
           JVM_CXXFLAGS += -I$(TOPDIR)/src/hotspot/os_cpu/horizon_aarch64
           EOF
 
+      # ============================================================
+      # Validate generated port
+      # ============================================================
+
       - name: Validate Horizon source tree
         shell: bash
         run: |
@@ -1099,6 +1303,9 @@ jobs:
 
           test -f \
             openjdk21/src/hotspot/os_cpu/horizon_aarch64/orderAccess_horizon_aarch64.hpp
+
+          test -f \
+            openjdk21/src/hotspot/os_cpu/horizon_aarch64/atomic_horizon_aarch64.hpp
 
           echo "===== HORIZON OS ====="
 
@@ -1120,10 +1327,10 @@ jobs:
             | sort
 
       # ============================================================
-      # Build
+      # Probe HotSpot
       # ============================================================
 
-      - name: Probe HotSpot v2.5
+      - name: Probe HotSpot v2.6
         shell: bash
         run: |
           set +e
@@ -1145,7 +1352,7 @@ jobs:
             LOG=trace \
             hotspot \
             2>&1 \
-            | tee ../horizon-research/hotspot-build-v2.5.log
+            | tee ../horizon-research/hotspot-build-v2.6.log
 
           STATUS=${PIPESTATUS[0]}
 
@@ -1158,7 +1365,7 @@ jobs:
       # Analyze next failure
       # ============================================================
 
-      - name: Analyze HotSpot v2.5
+      - name: Analyze HotSpot v2.6
         shell: bash
         run: |
           set +e
@@ -1168,7 +1375,7 @@ jobs:
           import re
 
           log_path = Path(
-              "horizon-research/hotspot-build-v2.5.log"
+              "horizon-research/hotspot-build-v2.6.log"
           )
 
           if not log_path.exists():
@@ -1234,6 +1441,12 @@ jobs:
               "No such file or directory" in text
           )
 
+          result(
+              "atomic-result.txt",
+              "fatal error: atomic_horizon_aarch64.hpp: "
+              "No such file or directory" in text
+          )
+
           missing = []
 
           for m in re.findall(
@@ -1247,7 +1460,7 @@ jobs:
 
           Path(
               "horizon-research/"
-              "missing-horizon-headers-v2.5.txt"
+              "missing-horizon-headers-v2.6.txt"
           ).write_text(
               (
                   "\n".join(missing) + "\n"
@@ -1334,7 +1547,7 @@ jobs:
           out = [
               "========================================",
               " Minecraft-NX",
-              " HOTSPOT DIAGNOSTIC v2.5",
+              " HOTSPOT DIAGNOSTIC v2.6",
               " Created by Farbert_Took",
               "========================================",
               "",
@@ -1373,7 +1586,7 @@ jobs:
               ]
 
           Path(
-              "horizon-research/diagnostic-v2.5.txt"
+              "horizon-research/diagnostic-v2.6.txt"
           ).write_text(
               "\n".join(out) + "\n"
           )
@@ -1398,7 +1611,7 @@ jobs:
 
           Path(
               "horizon-research/"
-              "portability-errors-v2.5.txt"
+              "portability-errors-v2.6.txt"
           ).write_text(
               (
                   "\n".join(portability[:150]) + "\n"
@@ -1410,15 +1623,15 @@ jobs:
 
           tail \
             -n 300 \
-            horizon-research/hotspot-build-v2.5.log \
-            > horizon-research/hotspot-last-300-v2.5.txt \
+            horizon-research/hotspot-build-v2.6.log \
+            > horizon-research/hotspot-last-300-v2.6.txt \
             2>/dev/null \
             || true
 
           exit 0
 
       # ============================================================
-      # Save Horizon source
+      # Save port sources
       # ============================================================
 
       - name: Save Horizon port sources
@@ -1443,7 +1656,7 @@ jobs:
             || true
 
           git -C openjdk21 diff \
-            > horizon-research/openjdk-horizon-v2.5.patch
+            > horizon-research/openjdk-horizon-v2.6.patch
 
           exit 0
 
@@ -1501,9 +1714,14 @@ jobs:
             2>/dev/null || echo unknown
           )
 
+          ATOMIC=$(
+            cat horizon-research/atomic-result.txt \
+            2>/dev/null || echo unknown
+          )
+
           echo ""
           echo "========================================"
-          echo " Minecraft-NX v2.5 COMPACT RESULT"
+          echo " Minecraft-NX v2.6 COMPACT RESULT"
           echo " Created by Farbert_Took"
           echo "========================================"
           echo ""
@@ -1517,13 +1735,14 @@ jobs:
           echo "globals_horizon blocker: $GLOBALS"
           echo "globals_horizon_aarch64 blocker: $OSCPU"
           echo "orderAccess_horizon_aarch64 blocker: $ORDERACCESS"
+          echo "atomic_horizon_aarch64 blocker: $ATOMIC"
 
           echo ""
           echo "===== OS+CPU STRATEGY ====="
           echo ""
 
           cat \
-            horizon-research/os-cpu-strategy-v2.5.txt \
+            horizon-research/os-cpu-strategy-v2.6.txt \
             2>/dev/null \
             || true
 
@@ -1532,7 +1751,16 @@ jobs:
           echo ""
 
           cat \
-            horizon-research/orderaccess-strategy-v2.5.txt \
+            horizon-research/orderaccess-strategy-v2.6.txt \
+            2>/dev/null \
+            || true
+
+          echo ""
+          echo "===== ATOMIC STRATEGY ====="
+          echo ""
+
+          cat \
+            horizon-research/atomic-strategy-v2.6.txt \
             2>/dev/null \
             || true
 
@@ -1541,7 +1769,7 @@ jobs:
           echo ""
 
           cat \
-            horizon-research/missing-horizon-headers-v2.5.txt \
+            horizon-research/missing-horizon-headers-v2.6.txt \
             2>/dev/null \
             || true
 
@@ -1550,7 +1778,7 @@ jobs:
           echo ""
 
           sed -n '1,150p' \
-            horizon-research/diagnostic-v2.5.txt \
+            horizon-research/diagnostic-v2.6.txt \
             2>/dev/null \
             || true
 
@@ -1559,19 +1787,19 @@ jobs:
           echo ""
 
           sed -n '1,100p' \
-            horizon-research/portability-errors-v2.5.txt \
+            horizon-research/portability-errors-v2.6.txt \
             2>/dev/null \
             || true
 
           echo ""
           echo "========================================"
-          echo " END Minecraft-NX v2.5"
+          echo " END Minecraft-NX v2.6"
           echo "========================================"
 
           exit 0
 
-      - name: Upload Horizon Research v2.5
+      - name: Upload Horizon Research v2.6
         uses: actions/upload-artifact@v4
         with:
-          name: Minecraft-NX-Farbert_Took-OpenJDK-Horizon-v2.5
+          name: Minecraft-NX-Farbert_Took-OpenJDK-Horizon-v2.6
           path: horizon-research
